@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell, MessageSquare, HelpCircle, ChevronDown, UserCircle, Settings, LogOut, Menu } from 'lucide-react'
 import { useToast } from './Toast'
+import { getAvatarUrl } from '../lib/avatar'
 
 export default function TopNav({ user, onMenuClick }) {
   const showToast = useToast()
@@ -55,7 +56,7 @@ export default function TopNav({ user, onMenuClick }) {
       <div className="relative flex-shrink-0">
         <div onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-2 cursor-pointer px-1.5 sm:px-2.5 py-1 rounded-lg hover:bg-slate-50">
           <img
-            src={`https://i.pravatar.cc/64?u=${user?.email || 'demo'}`}
+            src={getAvatarUrl(user?.email)}
             alt=""
             className="rounded-full object-cover flex-shrink-0"
             style={{ width: 32, height: 32 }}

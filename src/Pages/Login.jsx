@@ -13,6 +13,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [lockedOut, setLockedOut] = useState(false)
   const [mode, setMode] = useState('login')
   const [resetEmail, setResetEmail] = useState('')
   const [demoRole, setDemoRole] = useState('doctor')
@@ -20,6 +21,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault()
     setError('')
+    setLockedOut(false)
     setLoading(true)
     try {
       const { token, user } = await api.login(email, password, demoRole)
@@ -27,7 +29,19 @@ export default function Login() {
       localStorage.setItem('medvault_user', JSON.stringify(user))
       navigate('/dashboard')
     } catch (err) {
-      setError('Login failed — check your email and password.')
+      // A network/CORS failure throws a generic "Failed to fetch" TypeError from
+      // the browser itself — that's not the same as a real 401 from the backend,
+      // and showing "check your email and password" for it is actively misleading.
+      if (err instanceof TypeError) {
+        setError('Could not reach the server. It may be waking up (can take ~50s) or there may be a connection issue — try again in a moment.')
+      } else if (err.message?.toLowerCase().includes('locked')) {
+        // Confirmed exact string from the real backend (app/access_control/jwt_handlers.py
+        // and auth/routes.py): "Account is locked due to multiple failed login attempts."
+        setLockedOut(true)
+        setError(err.message)
+      } else {
+        setError(err.message || 'Login failed — check your email and password.')
+      }
     } finally {
       setLoading(false)
     }
@@ -147,7 +161,7 @@ export default function Login() {
             Trusted patient records for<br /><span className="text-blue-400">{hospital}</span>
           </h2>
           <p className="text-[13px] text-slate-400 leading-relaxed">
-            NDPR-compliant patient record management<br />for modern Nigerian healthcare professionals.
+            NDPA 2023-compliant patient record management<br />for modern Nigerian healthcare professionals.
           </p>
         </div>
       </div>
@@ -164,7 +178,7 @@ export default function Login() {
 
               <form onSubmit={handleLogin} className="flex flex-col" style={{ gap: 18 }}>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Sign in as (demo)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Preview role (demo only — has no effect on real accounts)</label>
                   <select
                     value={demoRole}
                     onChange={(e) => setDemoRole(e.target.value)}
@@ -204,7 +218,12 @@ export default function Login() {
                   </div>
                 </div>
 
-                {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+                {error && (
+                  <div className={`text-xs rounded-lg px-3 py-2 border ${lockedOut ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'}`}>
+                    {error}
+                    {lockedOut && ' Contact an administrator to unlock your account.'}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -268,7 +287,7 @@ export default function Login() {
                 <ShieldCheck size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="text-[12.5px] font-semibold text-emerald-800">Secure Connection Active</div>
-                  <div className="text-[11.5px] text-emerald-600 mt-0.5">TLS 1.3 · AES-256 · NDPR Compliant</div>
+                  <div className="text-[11.5px] text-emerald-600 mt-0.5">TLS 1.3 · AES-256 · NDPA 2023 Compliant</div>
                 </div>
               </div>
 

@@ -1,26 +1,44 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, Download, UploadCloud, Calendar, SlidersHorizontal,
-  ScanLine, FlaskConical, FileText, Image, HeartPulse, Eye, Share2, ChevronLeft, ChevronRight,
+  Search, Download, UploadCloud, SlidersHorizontal,
+  ScanLine, FlaskConical, FileText, Image, HeartPulse, Eye, Share2, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
-import { records } from '../lib/mockData'
+import { api } from '../lib/api'
 import { Card, EncBadge } from '../components/ui'
 import { useToast } from '../components/Toast'
 
+// Icon/category mapping for the 6 real record_type values from the backend
+// contract (dts302_api_contract, MedVault Group 4).
 const typeIcons = {
-  'MRI Scan': { icon: ScanLine, bg: 'bg-violet-50', color: 'text-violet-600', category: 'Imaging' },
-  'Blood Panel': { icon: FlaskConical, bg: 'bg-blue-50', color: 'text-blue-600', category: 'Lab Reports' },
+  'Lab Report': { icon: FlaskConical, bg: 'bg-blue-50', color: 'text-blue-600', category: 'Lab Reports' },
+  Imaging: { icon: ScanLine, bg: 'bg-violet-50', color: 'text-violet-600', category: 'Imaging' },
+  Prescription: { icon: HeartPulse, bg: 'bg-pink-50', color: 'text-pink-700', category: 'Prescriptions' },
   'Discharge Summary': { icon: FileText, bg: 'bg-emerald-50', color: 'text-emerald-600', category: 'Discharge' },
-  'X-Ray': { icon: Image, bg: 'bg-amber-50', color: 'text-amber-600', category: 'Imaging' },
-  'ECG Report': { icon: HeartPulse, bg: 'bg-pink-50', color: 'text-pink-700', category: 'Lab Reports' },
+  Vitals: { icon: HeartPulse, bg: 'bg-amber-50', color: 'text-amber-600', category: 'Vitals' },
+  'Clinical Notes': { icon: FileText, bg: 'bg-slate-100', color: 'text-slate-600', category: 'Clinical Notes' },
 }
 
-const filterTypes = ['All Types', 'Lab Reports', 'Imaging', 'Prescriptions', 'Discharge']
+const filterTypes = ['All Types', 'Lab Reports', 'Imaging', 'Prescriptions', 'Discharge', 'Vitals', 'Clinical Notes']
+
+function formatBytes(bytes) {
+  if (!bytes) return '—'
+  const mb = bytes / (1024 * 1024)
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`
+}
+
+function formatDate(timestamp) {
+  if (!timestamp) return '—'
+  try {
+    return new Date(timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch {
+    return timestamp
+  }
+}
 
 function downloadCSV(rows) {
-  const header = 'Record ID,Patient,Patient ID,Type,Doctor,Department,Date,Size\n'
-  const body = rows.map((r) => `${r.id},${r.patient},${r.patientId},${r.type},${r.doctor},${r.dept},${r.date},${r.size}`).join('\n')
+  const header = 'Record ID,Patient,Type,Uploaded By,Department,Date,Size\n'
+  const body = rows.map((r) => `${r.id},${r.patient},${r.type},${r.doctor},${r.dept},${r.date},${r.size}`).join('\n')
   const blob = new Blob([header + body], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -38,18 +56,58 @@ export default function Records() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
+  const [records, setRecords] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setLoadError('')
+    api
+      .getRecords()
+      .then((data) => {
+        if (cancelled) return
+        // Map the backend's field names to what this page renders.
+        // Note: the contract's GET /records response has no patient_id per
+        // record (only patient_name), so linking a row to a patient profile
+        // isn't possible yet — worth asking him to add patient_id here.
+        const mapped = (data || []).map((r) => ({
+          id: r.id,
+          patient: r.patient_name,
+          patientId: r.patient_id || null,
+          type: r.record_type,
+          doctor: r.uploaded_by_name,
+          dept: r.department || '—',
+          date: formatDate(r.created_at),
+          size: formatBytes(r.file_size),
+        }))
+        setRecords(mapped)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof TypeError) {
+          setLoadError('Could not reach the server — it may be waking up, try refreshing shortly')
+        } else {
+          setLoadError(err.message || 'Could not load records')
+        }
+      })
+      .finally(() => !cancelled && setLoading(false))
+    return () => { cancelled = true }
+  }, [])
+
   const filtered = useMemo(() => {
     return records.filter((r) => {
       const matchesSearch =
         !search ||
-        r.patient.toLowerCase().includes(search.toLowerCase()) ||
-        r.type.toLowerCase().includes(search.toLowerCase()) ||
-        r.doctor.toLowerCase().includes(search.toLowerCase())
+        (r.patient || '').toLowerCase().includes(search.toLowerCase()) ||
+        (r.type || '').toLowerCase().includes(search.toLowerCase()) ||
+        (r.doctor || '').toLowerCase().includes(search.toLowerCase())
       const category = typeIcons[r.type]?.category
       const matchesFilter = activeFilter === 'All Types' || category === activeFilter
       return matchesSearch && matchesFilter
     })
-  }, [search, activeFilter])
+  }, [records, search, activeFilter])
 
   return (
     <div>
@@ -127,7 +185,7 @@ export default function Records() {
                 <th className="px-4 py-2.5 w-10">
                   <input type="checkbox" className="w-3.5 h-3.5 accent-blue-600" />
                 </th>
-                {['Record ID', 'Patient', 'Record Type', 'Doctor', 'Department', 'Date', 'Size', 'Security', 'Actions'].map((h) => (
+                {['Record ID', 'Patient', 'Record Type', 'Uploaded By', 'Department', 'Date', 'Size', 'Security', 'Actions'].map((h) => (
                   <th key={h} className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap">
                     {h}
                   </th>
@@ -135,13 +193,26 @@ export default function Records() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="text-center text-sm text-slate-400 py-10">
+                    <Loader2 size={18} className="animate-spin inline-block mr-2" />
+                    Loading records...
+                  </td>
+                </tr>
+              )}
+              {!loading && loadError && (
+                <tr>
+                  <td colSpan={9} className="text-center text-sm text-red-500 py-10">{loadError}</td>
+                </tr>
+              )}
+              {!loading && !loadError && filtered.length === 0 && (
                 <tr>
                   <td colSpan={9} className="text-center text-sm text-slate-400 py-10">No records match your search or filter.</td>
                 </tr>
               )}
-              {filtered.map((r) => {
-                const t = typeIcons[r.type] || typeIcons['Discharge Summary']
+              {!loading && !loadError && filtered.map((r) => {
+                const t = typeIcons[r.type] || typeIcons['Clinical Notes']
                 return (
                   <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-3">
@@ -150,7 +221,6 @@ export default function Records() {
                     <td className="px-4 py-3 text-xs font-mono text-slate-500">{r.id}</td>
                     <td className="px-4 py-3">
                       <div className="text-[13.5px] font-medium text-slate-800">{r.patient}</div>
-                      <div className="text-[11.5px] text-slate-400">{r.patientId}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
@@ -170,8 +240,10 @@ export default function Records() {
                     <td className="px-4 py-3">
                       <div className="flex gap-1.5">
                         <button
-                          onClick={() => navigate(`/patients/${r.patientId}`)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
+                          disabled={!r.patientId}
+                          title={r.patientId ? 'View patient' : 'Patient link not available from this list yet'}
+                          onClick={() => r.patientId && navigate(`/patients/${r.patientId}`)}
+                          className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Eye size={12} />
                         </button>

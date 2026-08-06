@@ -1,43 +1,65 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  Calendar, Download, ShieldCheck, LogIn, AlertTriangle, Key,
-  Search, UserPlus, Eye, UploadCloud, Database,
+  Calendar, Download, ShieldCheck, LogIn, LogOut, AlertTriangle, Key,
+  Search, UserPlus, Eye, UploadCloud, UserCog, ShieldAlert, Loader2, FileWarning,
 } from 'lucide-react'
-import { auditLogs } from '../lib/mockData'
+import { api } from '../lib/api'
 import { Badge, Card } from '../components/ui'
 import { useToast } from '../components/Toast'
 
+// These are the exact action label strings the backend contract
+// (dts302_api_contract, MedVault Group 4) documents as stored/returned.
 const actionIcons = {
-  'Patient Admitted': { icon: UserPlus, bg: 'bg-blue-50', color: 'text-blue-600' },
+  'Login Success': { icon: LogIn, bg: 'bg-emerald-50', color: 'text-emerald-600' },
+  'Login Failed': { icon: LogIn, bg: 'bg-red-50', color: 'text-red-600' },
+  'Account Locked': { icon: ShieldAlert, bg: 'bg-red-50', color: 'text-red-600' },
+  'Account Unlocked': { icon: Key, bg: 'bg-amber-50', color: 'text-amber-600' },
   'Record Viewed': { icon: Eye, bg: 'bg-violet-50', color: 'text-violet-600' },
-  'Failed Login (x3)': { icon: LogIn, bg: 'bg-red-50', color: 'text-red-600' },
   'Record Uploaded': { icon: UploadCloud, bg: 'bg-emerald-50', color: 'text-emerald-600' },
-  'Permission Changed': { icon: Key, bg: 'bg-amber-50', color: 'text-amber-600' },
-  'Daily Backup': { icon: Database, bg: 'bg-sky-50', color: 'text-sky-600' },
+  'Permission Denied': { icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600' },
+  'User Created': { icon: UserPlus, bg: 'bg-blue-50', color: 'text-blue-600' },
+  'User Updated': { icon: UserCog, bg: 'bg-blue-50', color: 'text-blue-600' },
+  'Role Changed': { icon: Key, bg: 'bg-amber-50', color: 'text-amber-600' },
+  'Patient Created': { icon: UserPlus, bg: 'bg-blue-50', color: 'text-blue-600' },
+  'Duplicate Patient Warning': { icon: FileWarning, bg: 'bg-amber-50', color: 'text-amber-600' },
+  'Audit Logs Viewed': { icon: Eye, bg: 'bg-slate-100', color: 'text-slate-600' },
+  'Audit Report Viewed': { icon: Eye, bg: 'bg-slate-100', color: 'text-slate-600' },
 }
 
 const roleBadgeStyle = {
   doctor: 'bg-blue-100 text-blue-700',
   admin: 'bg-violet-100 text-violet-800',
-  failed: 'bg-red-100 text-red-800',
-  system: 'bg-sky-100 text-sky-700',
+  nurse: 'bg-pink-100 text-pink-900',
+  lab_technician: 'bg-amber-100 text-amber-800',
+  records_officer: 'bg-teal-100 text-teal-800',
+  auditor: 'bg-slate-200 text-slate-700',
 }
 
-const statusTone = { Success: 'success', Blocked: 'failed', Review: 'warning' }
+// Real status values per the contract: Success, Failed, Blocked, Error, Review
+const statusTone = { Success: 'success', Failed: 'critical', Blocked: 'blocked', Error: 'error', Review: 'warning' }
 
 const filters = ['All Events', 'Login', 'Record Access', 'Upload', 'Failed']
 
 function matchesFilter(log, filter) {
   if (filter === 'All Events') return true
-  if (filter === 'Login') return log.action.toLowerCase().includes('login')
+  if (filter === 'Login') return log.action.startsWith('Login') || log.action.startsWith('Account')
   if (filter === 'Record Access') return log.action === 'Record Viewed'
   if (filter === 'Upload') return log.action === 'Record Uploaded'
-  if (filter === 'Failed') return log.status === 'Blocked'
+  if (filter === 'Failed') return log.status === 'Blocked' || log.status === 'Failed'
   return true
 }
 
+function formatTimestamp(ts) {
+  if (!ts) return '—'
+  try {
+    return new Date(ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ts
+  }
+}
+
 function downloadCSV(rows) {
-  const header = 'Timestamp,User,Role,Action,Target,IP,Status\n'
+  const header = 'Timestamp,User,Role,Action,Record,IP,Status\n'
   const body = rows.map((r) => `${r.time},${r.user},${r.role},${r.action},${r.target},${r.ip},${r.status}`).join('\n')
   const blob = new Blob([header + body], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
@@ -52,35 +74,71 @@ export default function Audit() {
   const showToast = useToast()
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('All Events')
-  const [dateFrom, setDateFrom] = useState('2026-07-08')
-  const [dateTo, setDateTo] = useState('2026-07-14')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setLoadError('')
+    api
+      .getAuditLogs()
+      .then((data) => {
+        if (cancelled) return
+        const mapped = (data || []).map((l) => ({
+          id: l.id,
+          user: l.user_name,
+          role: l.role_at_time,
+          roleType: (l.role_at_time || '').toLowerCase().replace(/\s+/g, '_'),
+          action: l.action,
+          target: l.record_id || '—',
+          ip: l.ip_address,
+          status: l.status,
+          time: formatTimestamp(l.timestamp),
+          rawTime: l.timestamp,
+        }))
+        setLogs(mapped)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof TypeError) {
+          setLoadError('Could not reach the server — it may be waking up, try refreshing shortly')
+        } else {
+          setLoadError(err.message || 'Could not load audit logs')
+        }
+      })
+      .finally(() => !cancelled && setLoading(false))
+    return () => { cancelled = true }
+  }, [])
 
   const filtered = useMemo(() => {
-    return auditLogs.filter((log) => {
+    return logs.filter((log) => {
       const matchesSearch =
         !search ||
-        log.user.toLowerCase().includes(search.toLowerCase()) ||
-        log.action.toLowerCase().includes(search.toLowerCase()) ||
-        log.target.toLowerCase().includes(search.toLowerCase())
-      const logDate = log.time.split(' ')[0]
+        (log.user || '').toLowerCase().includes(search.toLowerCase()) ||
+        (log.action || '').toLowerCase().includes(search.toLowerCase()) ||
+        (log.target || '').toLowerCase().includes(search.toLowerCase())
+      const logDate = (log.rawTime || '').slice(0, 10)
       const inRange = (!dateFrom || logDate >= dateFrom) && (!dateTo || logDate <= dateTo)
       return matchesSearch && matchesFilter(log, activeFilter) && inRange
     })
-  }, [search, activeFilter, dateFrom, dateTo])
+  }, [logs, search, activeFilter, dateFrom, dateTo])
+
+  // Metrics derived from what we actually fetched — no fabricated numbers.
+  const failedLogins = logs.filter((l) => l.action === 'Login Failed').length
+  const uploads = logs.filter((l) => l.action === 'Record Uploaded').length
+  const views = logs.filter((l) => l.action === 'Record Viewed').length
 
   const metrics = [
-    { icon: ShieldCheck, bg: 'bg-emerald-50', color: 'text-emerald-600', badge: 'Excellent', badgeTone: 'bg-emerald-100 text-emerald-800', value: '94', label: 'Security Score' },
-    { icon: LogIn, bg: 'bg-blue-50', color: 'text-blue-600', badge: 'Normal', badgeTone: 'bg-blue-100 text-blue-700', value: '2,841', label: 'Login Events' },
-    { icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', badge: 'Review', badgeTone: 'bg-red-100 text-red-800', value: String(auditLogs.filter((l) => l.status === 'Blocked').length), valueColor: 'text-red-600', label: 'Failed Logins' },
-    { icon: Download, bg: 'bg-violet-50', color: 'text-violet-600', badge: '↑ 8%', badgeTone: 'bg-violet-100 text-violet-800', value: '892', label: 'Record Downloads' },
-    { icon: Key, bg: 'bg-amber-50', color: 'text-amber-600', badge: '2 Active', badgeTone: 'bg-amber-100 text-amber-800', value: '2', label: 'Privilege Escalations' },
+    { icon: LogIn, bg: 'bg-blue-50', color: 'text-blue-600', value: String(logs.filter((l) => l.action === 'Login Success').length), label: 'Successful Logins' },
+    { icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', value: String(failedLogins), valueColor: failedLogins > 0 ? 'text-red-600' : undefined, label: 'Failed Logins' },
+    { icon: UploadCloud, bg: 'bg-emerald-50', color: 'text-emerald-600', value: String(uploads), label: 'Records Uploaded' },
+    { icon: Eye, bg: 'bg-violet-50', color: 'text-violet-600', value: String(views), label: 'Records Viewed' },
   ]
-
-  const handleLast7Days = () => {
-    setDateFrom('2026-07-08')
-    setDateTo('2026-07-14')
-    showToast('Showing last 7 days of activity')
-  }
 
   const handleSecurityReport = () => {
     showToast('Generating security report from current audit data...')
@@ -92,12 +150,9 @@ export default function Audit() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl font-display font-bold text-slate-800">Audit Logs</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time activity monitoring · {filtered.length} of {auditLogs.length} events shown</p>
+          <p className="text-sm text-slate-500 mt-0.5">{filtered.length} of {logs.length} events shown</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleLast7Days} className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 flex items-center gap-1.5 hover:bg-slate-50">
-            <Calendar size={14} />Last 7 Days
-          </button>
           <button onClick={() => downloadCSV(filtered)} className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 flex items-center gap-1.5 hover:bg-slate-50">
             <Download size={14} />Export Logs
           </button>
@@ -107,14 +162,11 @@ export default function Audit() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-4">
         {metrics.map((m) => (
           <Card key={m.label} className="p-4">
-            <div className="flex items-start justify-between mb-2.5">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${m.bg}`}>
-                <m.icon size={18} className={m.color} />
-              </div>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${m.badgeTone}`}>{m.badge}</span>
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2.5 ${m.bg}`}>
+              <m.icon size={18} className={m.color} />
             </div>
             <div className={`text-2xl font-display font-bold ${m.valueColor || 'text-slate-800'}`}>{m.value}</div>
             <div className="text-xs text-slate-500 mt-0.5">{m.label}</div>
@@ -128,7 +180,7 @@ export default function Audit() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by user, action, or patient..."
+            placeholder="Search by user, action, or record..."
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-500"
           />
         </div>
@@ -158,29 +210,32 @@ export default function Audit() {
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                {['Timestamp', 'User', 'Role', 'Action', 'Patient / Resource', 'IP Address', 'Status'].map((h) => (
+                {['Timestamp', 'User', 'Role', 'Action', 'Record', 'IP Address', 'Status'].map((h) => (
                   <th key={h} className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="text-center text-sm text-slate-400 py-10">No events match your search, filter, or date range.</td>
-                </tr>
+              {loading && (
+                <tr><td colSpan={7} className="text-center text-sm text-slate-400 py-10"><Loader2 size={18} className="animate-spin inline-block mr-2" />Loading audit logs...</td></tr>
               )}
-              {filtered.map((log, i) => {
+              {!loading && loadError && (
+                <tr><td colSpan={7} className="text-center text-sm text-red-500 py-10">{loadError}</td></tr>
+              )}
+              {!loading && !loadError && filtered.length === 0 && (
+                <tr><td colSpan={7} className="text-center text-sm text-slate-400 py-10">No events match your search, filter, or date range.</td></tr>
+              )}
+              {!loading && !loadError && filtered.map((log) => {
                 const a = actionIcons[log.action] || actionIcons['Record Viewed']
-                const isFailed = log.status === 'Blocked'
+                const isFailed = log.status === 'Blocked' || log.status === 'Failed'
                 return (
-                  <tr key={i} className={`border-b border-slate-100 last:border-0 ${isFailed ? 'bg-red-50/40' : 'hover:bg-slate-50'}`}>
+                  <tr key={log.id} className={`border-b border-slate-100 last:border-0 ${isFailed ? 'bg-red-50/40' : 'hover:bg-slate-50'}`}>
                     <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">{log.time}</td>
                     <td className="px-4 py-3">
                       <div className="text-[13.5px] font-medium text-slate-800">{log.user}</div>
-                      <div className="text-[11.5px] text-slate-400">{log.dept}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${roleBadgeStyle[log.roleType]}`}>{log.role}</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${roleBadgeStyle[log.roleType] || 'bg-slate-100 text-slate-600'}`}>{log.role}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
@@ -190,11 +245,9 @@ export default function Audit() {
                         <span className={`text-[13px] whitespace-nowrap ${isFailed ? 'text-red-800 font-medium' : 'text-slate-700'}`}>{log.action}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[13px] text-slate-500 whitespace-nowrap">
-                      {log.target !== '—' ? <span className="text-blue-600 cursor-pointer">{log.target}</span> : '—'}
-                    </td>
+                    <td className="px-4 py-3 text-[13px] text-slate-500 whitespace-nowrap font-mono">{log.target}</td>
                     <td className={`px-4 py-3 text-xs font-mono whitespace-nowrap ${isFailed ? 'text-red-600 font-medium' : 'text-slate-500'}`}>{log.ip}</td>
-                    <td className="px-4 py-3"><Badge tone={statusTone[log.status]}>{log.status}</Badge></td>
+                    <td className="px-4 py-3"><Badge tone={statusTone[log.status] || 'discharged'}>{log.status}</Badge></td>
                   </tr>
                 )
               })}
@@ -203,9 +256,6 @@ export default function Audit() {
         </div>
         <div className="flex items-center justify-between border-t border-slate-100" style={{ padding: '14px 18px' }}>
           <div className="text-[13px] text-slate-500">Showing 1–{filtered.length} of {filtered.length} events logged</div>
-          <div className="flex gap-1.5 items-center">
-            <button className="min-w-[30px] h-7 rounded-md bg-blue-600 text-white text-xs">1</button>
-          </div>
         </div>
       </Card>
     </div>

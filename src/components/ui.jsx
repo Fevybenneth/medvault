@@ -8,6 +8,8 @@ const badgeStyles = {
   active: 'bg-emerald-100 text-emerald-800',
   blocked: 'bg-red-100 text-red-800',
   success: 'bg-emerald-100 text-emerald-800',
+  warning: 'bg-amber-100 text-amber-800',
+  error: 'bg-red-100 text-red-800',
 }
 
 export function Badge({ tone = 'discharged', children }) {
@@ -43,8 +45,8 @@ export function Button({ variant = 'secondary', size = 'md', className = '', chi
   )
 }
 
-export function Card({ className = '', children }) {
-  return <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>{children}</div>
+export function Card({ className = '', children, ...rest }) {
+  return <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`} {...rest}>{children}</div>
 }
 export function Progress({ value, className = '', color = '#2563eb' }) {
   return (

@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Search, Download, UserPlus, Edit2, FileText, ChevronLeft, ChevronRight } from 'lucide-react'
-import { patients } from '../lib/mockData'
+import { patients as mockPatients } from '../lib/mockData'
+import { getKnownPatients } from '../lib/localPatients'
 import { Badge, Card } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 const statusTone = { Admitted: 'admitted', Stable: 'stable', Discharged: 'discharged', Critical: 'critical' }
 const bloodTone = { 'O+': 'critical', 'O-': 'critical', 'A+': 'admitted', 'A-': 'admitted', 'B+': 'stable', 'B-': 'stable', 'AB+': 'discharged', 'AB-': 'discharged' }
 const statusFilters = ['All', 'Admitted', 'Discharged', 'Critical', 'Outpatient']
-const departments = [...new Set(patients.map((p) => p.dept))]
-const bloodGroups = [...new Set(patients.map((p) => p.blood))]
+const departments = [...new Set(mockPatients.map((p) => p.dept))]
+const bloodGroups = [...new Set(mockPatients.map((p) => p.blood))]
 
 function downloadCSV(rows) {
   const header = 'Patient ID,Name,Email,Age,Gender,Blood,Doctor,Department,Status\n'
@@ -31,19 +32,42 @@ export default function Patients() {
   const [deptFilter, setDeptFilter] = useState('All Departments')
   const [bloodFilter, setBloodFilter] = useState('All Blood Groups')
 
+  // Real patients you've created, merged in alongside the demo/mock ones.
+  // Real patients only have the fields the actual backend Patient model
+  // stores (name, age, gender, phone, national_id, hospital_id) — no blood
+  // group, department, or status, since the real system doesn't track those
+  // per-patient. Faking those fields would look wrong under close inspection.
+  const realPatients = getKnownPatients().map((p) => ({
+    id: p.id,
+    name: p.name,
+    email: null,
+    age: p.age || '—',
+    gender: p.gender || '—',
+    blood: null,
+    doctor: p.assignedDoctorId ? `Staff #${p.assignedDoctorId}` : '—',
+    dept: '—',
+    status: null,
+    hospitalId: p.hospitalId,
+    isReal: true,
+  }))
+
+  const allPatients = [...realPatients, ...mockPatients.map((p) => ({ ...p, isReal: false }))]
+
   const filtered = useMemo(() => {
-    return patients.filter((p) => {
+    return allPatients.filter((p) => {
       const matchesSearch =
         !search ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.id.toLowerCase().includes(search.toLowerCase()) ||
-        p.dept.toLowerCase().includes(search.toLowerCase())
-      const matchesStatus = statusFilter === 'All' || p.status === statusFilter
-      const matchesDept = deptFilter === 'All Departments' || p.dept === deptFilter
-      const matchesBlood = bloodFilter === 'All Blood Groups' || p.blood === bloodFilter
+        (p.dept || '').toLowerCase().includes(search.toLowerCase())
+      // Real patients have no status/dept/blood in the actual system, so they
+      // always pass these filters rather than being hidden by them.
+      const matchesStatus = p.isReal || statusFilter === 'All' || p.status === statusFilter
+      const matchesDept = p.isReal || deptFilter === 'All Departments' || p.dept === deptFilter
+      const matchesBlood = p.isReal || bloodFilter === 'All Blood Groups' || p.blood === bloodFilter
       return matchesSearch && matchesStatus && matchesDept && matchesBlood
     })
-  }, [search, statusFilter, deptFilter, bloodFilter])
+  }, [allPatients, search, statusFilter, deptFilter, bloodFilter])
 
   return (
     <div>
@@ -51,7 +75,7 @@ export default function Patients() {
         <div>
           <h1 className="text-xl font-display font-bold text-slate-800">Patient Management</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {patients.length} patients · {patients.filter((p) => p.status === 'Admitted').length} admitted today
+            {allPatients.length} patients ({realPatients.length} real, {mockPatients.length} demo) · {mockPatients.filter((p) => p.status === 'Admitted').length} admitted today
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -125,29 +149,32 @@ export default function Patients() {
                     <input type="checkbox" className="w-3.5 h-3.5 accent-blue-600" />
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-[12.5px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{p.id}</span>
+                    <span className="text-[12.5px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{p.hospitalId || p.id}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <img
-                        src={`https://i.pravatar.cc/64?u=${p.email}`}
+                        src={`https://i.pravatar.cc/64?u=${p.email || p.id}`}
                         alt=""
                         className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                       />
                       <div>
-                        <div className="text-sm font-medium text-slate-800">{p.name}</div>
-                        <div className="text-xs text-slate-400">{p.email}</div>
+                        <div className="text-sm font-medium text-slate-800 flex items-center gap-1.5">
+                          {p.name}
+                          {p.isReal && <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">REAL</span>}
+                        </div>
+                        {p.email && <div className="text-xs text-slate-400">{p.email}</div>}
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{p.age}{p.gender}</td>
                   <td className="px-4 py-3">
-                    <Badge tone={bloodTone[p.blood]}>{p.blood}</Badge>
+                    {p.blood ? <Badge tone={bloodTone[p.blood]}>{p.blood}</Badge> : <span className="text-xs text-slate-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{p.doctor}</td>
                   <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{p.dept}</td>
                   <td className="px-4 py-3">
-                    <Badge tone={statusTone[p.status]}>{p.status}</Badge>
+                    {p.status ? <Badge tone={statusTone[p.status]}>{p.status}</Badge> : <span className="text-xs text-slate-300">—</span>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1.5">

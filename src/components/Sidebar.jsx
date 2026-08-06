@@ -4,6 +4,7 @@ import {
   BarChart2, ShieldCheck, UserCog, Settings, LogOut, X,
 } from 'lucide-react'
 import { hospital } from '../lib/mockData'
+import { getAvatarUrl } from '../lib/avatar'
 
 const allNavItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', section: 'MAIN' },
@@ -87,7 +88,7 @@ export default function Sidebar({ user, isOpen, onClose }) {
         <div className="border-t border-white/5" style={{ padding: '14px 20px' }}>
           <div className="flex items-center gap-2.5 mb-3">
             <img
-              src={`https://i.pravatar.cc/64?u=${user?.email || 'demo'}`}
+              src={getAvatarUrl(user?.email)}
               alt=""
               className="rounded-full flex-shrink-0 object-cover"
               style={{ width: 34, height: 34 }}

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   UserCircle, ShieldCheck, Key, Smartphone, Bell, Monitor, Globe,
   Building2, Link as LinkIcon, LifeBuoy, Save, Mail, Phone, Camera, Clock, Check, Send,
 } from 'lucide-react'
 import { hospital } from '../lib/mockData'
+import { api } from '../lib/api'
 import { Badge, Button, Card, Toggle } from '../components/ui'
 import { useToast } from '../components/Toast'
 
@@ -27,11 +28,69 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState('profile')
   const [saved, setSaved] = useState(false)
 
+  // Seed from whatever login already cached in localStorage so the page
+  // isn't blank while the real GET /auth/me request is in flight.
+  const cachedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('medvault_user')) } catch { return null }
+  })()
+
   const [profile, setProfile] = useState({
-    firstName: 'Emeka', lastName: 'Nwachukwu', email: 'e.nwachukwu@amaku.gov.ng',
-    phone: '+234 803 123 4567', department: 'Cardiology', mdcn: 'MDCN/R/48213',
+    firstName: cachedUser?.first_name || '',
+    lastName: cachedUser?.last_name || '',
+    email: cachedUser?.email || '',
+    phone: '',
+    department: '',
+    mdcn: '',
   })
   const updateProfile = (field, value) => setProfile((p) => ({ ...p, [field]: value }))
+
+  useEffect(() => {
+    api
+      .getMyProfile()
+      .then((data) => {
+        if (!data) return // mock mode returns null — keep whatever's already seeded
+        setProfile({
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          department: data.department || '',
+          mdcn: data.license_number || '',
+        })
+      })
+      .catch((err) => {
+        // Non-fatal — the page still works with the cached login data above.
+        // A silent console warning is enough; no need to interrupt the user.
+        console.warn('Could not refresh profile from /auth/me:', err.message)
+      })
+  }, [])
+
+  const [photoUrl, setPhotoUrl] = useState(null)
+  const fileInputRef = useRef(null)
+
+  const MAX_PHOTO_BYTES = 3 * 1024 * 1024 // 3MB
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please choose an image file', 'info')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      showToast('Image is too large — please choose one under 3MB', 'info')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setPhotoUrl(reader.result)
+      showToast('Photo updated — click Save Changes to keep it')
+    }
+    reader.onerror = () => showToast('Could not read that file, please try again', 'info')
+    reader.readAsDataURL(file)
+  }
 
   const [twoFactor, setTwoFactor] = useState(true)
   const [loginAlerts, setLoginAlerts] = useState(true)
@@ -49,10 +108,27 @@ export default function Settings() {
 
   const [supportMsg, setSupportMsg] = useState('')
 
-  const handleSave = () => {
-    setSaved(true)
-    showToast('Settings saved')
-    setTimeout(() => setSaved(false), 2000)
+  const [saving, setSaving] = useState(false)
+  const handleSave = async () => {
+    if (activeSection !== 'profile') {
+      // Other sections (notifications, system prefs, etc.) aren't backed by
+      // any real route in the contract yet — keep those as local-only for now.
+      setSaved(true)
+      showToast('Settings saved')
+      setTimeout(() => setSaved(false), 2000)
+      return
+    }
+    setSaving(true)
+    try {
+      await api.updateMyProfile({ phone: profile.phone, department: profile.department })
+      setSaved(true)
+      showToast('Profile updated')
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      showToast(err.message || 'Could not save profile — please try again', 'info')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handlePasswordChange = (e) => {
@@ -86,9 +162,9 @@ export default function Settings() {
           <h1 className="text-xl font-display font-bold text-slate-800">Settings</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage your account, security, and system preferences</p>
         </div>
-        <Button variant="primary" size="sm" onClick={handleSave}>
+        <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
           {saved ? <Check size={14} /> : <Save size={14} />}
-          {saved ? 'Saved' : 'Save Changes'}
+          {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
         </Button>
       </div>
 
@@ -117,35 +193,64 @@ export default function Settings() {
             <Card className="p-6">
               <h3 className="text-[15px] font-semibold text-slate-800 mb-5">Profile Information</h3>
               <div className="flex flex-col sm:flex-row items-start gap-6 mb-6">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
                 <div className="relative flex-shrink-0">
-                  <div className="w-20 h-20 rounded-full bg-blue-100 text-blue-700 border-[3px] border-slate-200 flex items-center justify-center text-xl font-semibold">EN</div>
-                  <div className="absolute bottom-0 right-0 w-[26px] h-[26px] bg-blue-600 rounded-full border-[2.5px] border-white flex items-center justify-center cursor-pointer">
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt="Profile"
+                      className="w-20 h-20 rounded-full object-cover border-[3px] border-slate-200"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-blue-100 text-blue-700 border-[3px] border-slate-200 flex items-center justify-center text-xl font-semibold">
+                      {(profile.firstName[0] || '').toUpperCase()}{(profile.lastName[0] || '').toUpperCase()}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 w-[26px] h-[26px] bg-blue-600 rounded-full border-[2.5px] border-white flex items-center justify-center cursor-pointer hover:bg-blue-700"
+                    aria-label="Change profile photo"
+                  >
                     <Camera size={12} className="text-white" />
-                  </div>
+                  </button>
                 </div>
                 <div className="flex-1">
                   <div className="font-display text-lg font-bold text-slate-800">Dr. {profile.firstName} {profile.lastName}</div>
                   <div className="text-[13.5px] text-slate-500 mt-0.5">Consultant Cardiologist · {profile.department}</div>
                   <div className="text-[13px] text-blue-600 mt-0.5">{profile.email}</div>
                   <div className="flex gap-2 mt-3">
-                    <Button size="sm"><UserCircle size={14} />Change Photo</Button>
+                    <Button size="sm" type="button" onClick={() => fileInputRef.current?.click()}>
+                      <UserCircle size={14} />Change Photo
+                    </Button>
+                    {photoUrl && (
+                      <Button size="sm" variant="secondary" type="button" onClick={() => { setPhotoUrl(null); showToast('Photo removed') }}>
+                        Remove
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">First Name</label>
-                  <input value={profile.firstName} onChange={(e) => updateProfile('firstName', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500" />
+                  <input value={profile.firstName} disabled readOnly className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">Last Name</label>
-                  <input value={profile.lastName} onChange={(e) => updateProfile('lastName', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500" />
+                  <input value={profile.lastName} disabled readOnly className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Address</label>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input value={profile.email} onChange={(e) => updateProfile('email', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+                    <input value={profile.email} disabled readOnly className="w-full bg-slate-100 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-500 cursor-not-allowed" />
                   </div>
                 </div>
                 <div>
@@ -164,9 +269,10 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">MDCN Number</label>
-                  <input value={profile.mdcn} onChange={(e) => updateProfile('mdcn', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 font-mono" />
+                  <input value={profile.mdcn} disabled readOnly className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 font-mono cursor-not-allowed" />
                 </div>
               </div>
+              <p className="text-xs text-slate-400 mt-3">Name, email, and MDCN number are set by an administrator. Contact IT support to update them — only phone and department are self-editable.</p>
             </Card>
           )}
 

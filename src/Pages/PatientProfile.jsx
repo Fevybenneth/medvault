@@ -5,6 +5,7 @@ import {
   AlertCircle, AlertTriangle, UserPlus, FileText, FlaskConical, Pill, ScanLine, Stethoscope,
 } from 'lucide-react'
 import { patients } from '../lib/mockData'
+import { getKnownPatients } from '../lib/localPatients'
 import { Badge, Button, Card } from '../components/ui'
 
 const tabs = ['Overview', 'Medical Records', 'History', 'Medications', 'Allergies', 'Lab Results']
@@ -43,7 +44,49 @@ export default function PatientProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('Overview')
-  const patient = patients.find((p) => p.id === id) || patients[0]
+
+  // Check mock patients first, then real ones you've created (see localPatients.js).
+  // Previously this silently fell back to patients[0] when a real patient's id
+  // wasn't found in mock data — showing a completely unrelated person's fake
+  // medical details under the real patient's name. That was worse than an
+  // error page, so it's fixed here: unknown ids now show a clear not-found
+  // state instead of substituting a random patient.
+  const mockMatch = patients.find((p) => p.id === id)
+  const realMatch = getKnownPatients().find((p) => p.id === id)
+
+  const patient = mockMatch
+    ? { ...mockMatch, isReal: false }
+    : realMatch
+    ? {
+        id: realMatch.id,
+        name: realMatch.name,
+        age: realMatch.age || '—',
+        gender: realMatch.gender || '—',
+        blood: null,
+        doctor: realMatch.assignedDoctorId ? `Staff #${realMatch.assignedDoctorId}` : '—',
+        dept: '—',
+        status: null,
+        hospitalId: realMatch.hospitalId,
+        isReal: true,
+      }
+    : null
+
+  if (!patient) {
+    return (
+      <div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-4">
+          <Link to="/patients" className="text-blue-600">Patients</Link>
+          <ChevronRight size={13} />
+          <span className="text-slate-700">Not found</span>
+        </div>
+        <Card className="p-10 text-center">
+          <div className="text-sm font-semibold text-slate-700">No patient found with this ID</div>
+          <div className="text-[13px] text-slate-500 mt-1">It may have been removed, or the link is incorrect.</div>
+          <Link to="/patients"><Button size="sm" className="mt-4">Back to Patients</Button></Link>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -65,11 +108,14 @@ export default function PatientProfile() {
           <div className="flex-1 min-w-0 w-full">
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
-                <h1 className="font-display text-[22px] font-bold text-slate-800">{patient.name}</h1>
+                <h1 className="font-display text-[22px] font-bold text-slate-800 flex items-center gap-2">
+                  {patient.name}
+                  {patient.isReal && <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">REAL</span>}
+                </h1>
                 <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
-                  <span className="text-[13px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">{patient.id}</span>
-                  <Badge tone={statusTone[patient.status]}>{patient.status}</Badge>
-                  <Badge tone="admitted">{patient.dept}</Badge>
+                  <span className="text-[13px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">{patient.hospitalId || patient.id}</span>
+                  {patient.status && <Badge tone={statusTone[patient.status]}>{patient.status}</Badge>}
+                  {patient.dept && patient.dept !== '—' && <Badge tone="admitted">{patient.dept}</Badge>}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -81,22 +127,28 @@ export default function PatientProfile() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-4.5" style={{ marginTop: 18 }}>
               {[
-                ['Date of Birth', '12 Mar 1992'],
-                ['Age / Gender', `${patient.age} yrs · ${patient.gender === 'F' ? 'Female' : 'Male'}`],
-                ['Blood Group', patient.blood],
+                ['Date of Birth', patient.isReal ? '—' : '12 Mar 1992'],
+                ['Age / Gender', `${patient.age} yrs · ${patient.gender === 'F' ? 'Female' : patient.gender === 'M' ? 'Male' : patient.gender}`],
+                ['Blood Group', patient.blood || '—'],
                 ['Assigned Doctor', patient.doctor],
-                ['Admitted', '12 Jul 2026'],
-                ['NHIS Number', '234 567 8901'],
+                ['Admitted', patient.isReal ? '—' : '12 Jul 2026'],
+                ['NHIS Number', patient.isReal ? '—' : '234 567 8901'],
               ].map(([label, value]) => (
                 <div key={label}>
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
-                  <div className={`text-[13.5px] font-medium ${label === 'Blood Group' ? 'text-red-500 font-bold' : 'text-slate-800'}`}>{value}</div>
+                  <div className={`text-[13.5px] font-medium ${label === 'Blood Group' && value !== '—' ? 'text-red-500 font-bold' : 'text-slate-800'}`}>{value}</div>
                 </div>
               ))}
             </div>
           </div>
         </div>
       </Card>
+
+      {patient.isReal && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-800 mb-4" style={{ padding: '10px 14px' }}>
+          This is a real patient record. The Current Conditions, Allergies, Medications, and Timeline sections below are sample/demo content and not this patient's actual clinical data — that level of detail isn't tracked by the current system yet. Real uploaded records for this patient are on the Records page.
+        </div>
+      )}
 
       <Card className="overflow-hidden">
         <div className="flex border-b border-slate-200 px-5 overflow-x-auto">

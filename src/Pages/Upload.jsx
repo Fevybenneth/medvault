@@ -4,9 +4,35 @@ import {
   UploadCloud, FolderOpen, ScanLine, FileText, Image,
   CheckCircle2, User, FileType, Building2, Stethoscope, Calendar, ShieldCheck, X,
 } from 'lucide-react'
-import { patients } from '../lib/mockData'
+import { api } from '../lib/api'
+import { getKnownPatients } from '../lib/localPatients'
 import { Card, EncBadge, Progress } from '../components/ui'
 import { useToast } from '../components/Toast'
+
+// Matches record_type values + role permissions from the backend contract
+// (dts302_api_contract, MedVault Group 4)
+const RECORD_TYPES = ['Lab Report', 'Imaging', 'Prescription', 'Discharge Summary', 'Vitals', 'Clinical Notes']
+
+const UPLOAD_PERMISSIONS = {
+  doctor: ['Lab Report', 'Imaging', 'Prescription', 'Discharge Summary'],
+  nurse: ['Vitals', 'Clinical Notes'],
+  lab_technician: ['Lab Report'],
+  records_officer: [], // read-only role, cannot upload any record type
+  // Confirmed against the live backend (Aug 2026): admin gets a 403
+  // "Access denied: insufficient roles" on upload. The contract doc never
+  // actually listed admin as an upload-permitted role — that was my
+  // incorrect assumption, not something the doc said. Leaving this empty
+  // until/unless he confirms admin should have some upload access.
+  admin: [],
+}
+
+function getCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem('medvault_user'))
+  } catch {
+    return null
+  }
+}
 
 const iconForFile = (name) => {
   if (/\.(dcm|dicom)$/i.test(name)) return { icon: ScanLine, bg: 'bg-violet-50', color: 'text-violet-600' }
@@ -20,11 +46,19 @@ export default function Upload() {
   const fileInputRef = useRef(null)
   const [isDragging, setIsDragging] = useState(false)
   const [queue, setQueue] = useState([])
+
+  const user = getCurrentUser()
+  const allowedTypes = UPLOAD_PERMISSIONS[user?.role] ?? RECORD_TYPES // fall back to all when role is unknown, e.g. in dev/demo mode
+
+  // Real patients you've created via Add Patient (with real backend UUIDs) —
+  // see lib/localPatients.js for why this exists instead of a proper list route.
+  const knownPatients = getKnownPatients()
+
   const [form, setForm] = useState({
-    patient: patients[0]?.id || '',
-    type: 'MRI Scan',
+    patient: knownPatients[0]?.id || '',
+    type: allowedTypes[0] || '',
     dept: 'Cardiology',
-    doctor: [...new Set(patients.map((p) => p.doctor))][0] || '',
+    doctor: user?.name || '',
     date: '2026-07-14',
     notes: '',
   })
@@ -38,6 +72,7 @@ export default function Upload() {
       size: file.size,
       progress: 0,
       done: false,
+      file, // keep the raw File so it can actually be uploaded, not just simulated
       ...iconForFile(file.name),
     }))
     setQueue((q) => [...q, ...newItems])
@@ -66,15 +101,60 @@ export default function Upload() {
 
   const removeFromQueue = (id) => setQueue((q) => q.filter((item) => item.id !== id))
 
-  const handleSubmit = (e) => {
+  const [submitting, setSubmitting] = useState(false)
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!form.patient) {
+      showToast('Register a patient first — no real patients available to select yet', 'info')
+      return
+    }
     if (queue.length === 0) {
       showToast('Add at least one file before uploading', 'info')
       return
     }
-    const patientName = patients.find((p) => p.id === form.patient)?.name || 'patient'
-    showToast(`${form.type} uploaded and encrypted for ${patientName}`)
-    navigate('/records')
+    const patientName = knownPatients.find((p) => p.id === form.patient)?.name || 'patient'
+
+    // "data" is freeform clinical content per the contract (no fixed sub-schema) —
+    // this captures what the form collects. One record is created per queued file.
+    const clinicalData = { department: form.dept, doctor: form.doctor, date: form.date, notes: form.notes }
+
+    setSubmitting(true)
+    try {
+      for (const item of queue) {
+        await api.uploadRecord({
+          patientId: form.patient,
+          recordType: form.type,
+          data: clinicalData,
+          file: item.file,
+        })
+      }
+      showToast(`${form.type} uploaded and encrypted for ${patientName}`)
+      navigate('/records')
+    } catch (err) {
+      if (err instanceof TypeError) {
+        showToast('Could not reach the server — it may be waking up, try again shortly', 'info')
+      } else {
+        showToast(err.message || 'Upload failed — please try again', 'info')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (allowedTypes.length === 0) {
+    return (
+      <div>
+        <div className="mb-5">
+          <h1 className="text-xl font-display font-bold text-slate-800">Upload Medical Record</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Securely upload and encrypt patient records</p>
+        </div>
+        <Card style={{ padding: 32 }} className="text-center">
+          <ShieldCheck size={28} className="text-slate-300 mx-auto mb-3" />
+          <div className="text-sm font-semibold text-slate-700">Your role doesn't have upload permission</div>
+          <div className="text-[13px] text-slate-500 mt-1">Records Officer accounts are read-only for all record types. Contact an admin if this seems wrong.</div>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -164,13 +244,18 @@ export default function Upload() {
                 <select
                   value={form.patient}
                   onChange={(e) => updateForm('patient', e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                  disabled={knownPatients.length === 0}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500 disabled:opacity-60"
                 >
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
+                  {knownPatients.length === 0 && <option value="">No patients yet — register one first</option>}
+                  {knownPatients.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
+              {knownPatients.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1.5">No real patients found yet. Register one via Add Patient first — a listing route doesn't exist on the backend yet, so only patients you've created this session show up here.</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">Record Type</label>
@@ -181,8 +266,7 @@ export default function Upload() {
                   onChange={(e) => updateForm('type', e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
                 >
-                  <option>MRI Scan</option><option>X-Ray</option><option>Blood Panel</option>
-                  <option>ECG</option><option>Prescription</option><option>Discharge Summary</option>
+                  {allowedTypes.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
             </div>
@@ -204,15 +288,11 @@ export default function Upload() {
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">Ordering Doctor</label>
               <div className="relative">
                 <Stethoscope size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <select
+                <input
                   value={form.doctor}
                   onChange={(e) => updateForm('doctor', e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                >
-                  {[...new Set(patients.map((p) => p.doctor))].map((d) => (
-                    <option key={d}>{d}</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
             <div>
@@ -248,10 +328,11 @@ export default function Upload() {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white font-semibold text-[14.5px] py-3 rounded-[10px] hover:bg-blue-700 flex items-center justify-center gap-2"
+              disabled={submitting}
+              className="w-full bg-blue-600 text-white font-semibold text-[14.5px] py-3 rounded-[10px] hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <UploadCloud size={18} />
-              Upload &amp; Encrypt
+              {submitting ? 'Uploading...' : 'Upload & Encrypt'}
             </button>
           </div>
         </Card>
