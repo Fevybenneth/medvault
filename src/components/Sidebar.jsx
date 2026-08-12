@@ -4,7 +4,6 @@ import {
   BarChart2, ShieldCheck, UserCog, Settings, LogOut, X,
 } from 'lucide-react'
 import { hospital } from '../lib/mockData'
-import { getAvatarUrl } from '../lib/avatar'
 
 const allNavItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', section: 'MAIN' },
@@ -14,14 +13,29 @@ const allNavItems = [
   { to: '/laboratory', icon: FlaskConical, label: 'Laboratory', section: 'CLINICAL' },
   { to: '/pharmacy', icon: Pill, label: 'Pharmacy' },
   { to: '/reports', icon: BarChart2, label: 'Reports' },
-  { to: '/audit', icon: ShieldCheck, label: 'Audit Logs', badge: 3, section: 'SYSTEM', adminOnly: true },
-  { to: '/users', icon: UserCog, label: 'User Management', adminOnly: true },
+  // Confirmed from real backend source (app/audit/routes.py): admin AND
+  // auditor both have access — restricting to admin-only hid this from a
+  // role that's genuinely allowed to use it.
+  { to: '/audit', icon: ShieldCheck, label: 'Audit Logs', badge: 3, section: 'SYSTEM', allowedRoles: ['admin', 'auditor'] },
+  { to: '/users', icon: UserCog, label: 'User Management', allowedRoles: ['admin'] },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
 export default function Sidebar({ user, isOpen, onClose }) {
   const navigate = useNavigate()
-  const navItems = allNavItems.filter((item) => !item.adminOnly || user?.role === 'admin')
+  // Bug fix: this used to check item.adminOnly, which no nav item actually
+  // has (they all use allowedRoles) — so the filter never removed anything,
+  // and every role could see Audit Logs / User Management in the sidebar.
+  const navItems = allNavItems.filter((item) => !item.allowedRoles || item.allowedRoles.includes(user?.role))
+
+  const displayName = user?.first_name
+    ? (user.role === 'doctor' ? `Dr. ${user.first_name} ${user.last_name}` : `${user.first_name} ${user.last_name}`)
+    : 'Guest'
+  const roleLabelMap = {
+    doctor: 'Doctor', admin: 'Admin', nurse: 'Nurse',
+    lab_technician: 'Lab Technician', records_officer: 'Records Officer', auditor: 'Auditor',
+  }
+  const displayRole = roleLabelMap[user?.role] || user?.role || 'Guest'
 
   const handleSignOut = () => {
     localStorage.removeItem('medvault_token')
@@ -88,14 +102,14 @@ export default function Sidebar({ user, isOpen, onClose }) {
         <div className="border-t border-white/5" style={{ padding: '14px 20px' }}>
           <div className="flex items-center gap-2.5 mb-3">
             <img
-              src={getAvatarUrl(user?.email)}
+              src={`https://i.pravatar.cc/64?u=${user?.email || 'demo'}`}
               alt=""
               className="rounded-full flex-shrink-0 object-cover"
               style={{ width: 34, height: 34 }}
             />
             <div className="min-w-0">
-              <div className="text-[13px] font-semibold text-slate-300 truncate">{user?.name || 'Dr. Emeka Nwachukwu'}</div>
-              <div className="text-[11px] text-slate-500">{user?.roleLabel || 'Consultant'}</div>
+              <div className="text-[13px] font-semibold text-slate-300 truncate">{displayName}</div>
+              <div className="text-[11px] text-slate-500">{displayRole}</div>
             </div>
           </div>
           <button onClick={handleSignOut} className="flex items-center gap-2 w-full text-slate-400 hover:text-slate-200 text-[13px] py-2">

@@ -2,20 +2,25 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar, Download, Plus, Users, FileText, Stethoscope, Building2, Cloud, ShieldCheck,
-  UserPlus, UploadCloud, FlaskConical, Pill, BarChart2, FilePlus, AlertTriangle, UserCheck,
+  UserPlus, UploadCloud, FlaskConical, Pill, BarChart2, FilePlus, AlertTriangle, UserCheck, Loader2,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, LabelList } from 'recharts'
 import { admissionsByMonth, hospital } from '../lib/mockData'
+import { api } from '../lib/api'
 import { Card, Button, Progress } from '../components/ui'
 import { useToast } from '../components/Toast'
 
-const kpis = [
-  { label: 'Total Patients', value: '1,284', badge: '↑ 3.4%', badgeTone: 'bg-emerald-100 text-emerald-800', icon: Users, bg: 'bg-blue-50', color: 'text-blue-600' },
-  { label: 'Medical Records', value: '5,394', badge: '↑ 8.1%', badgeTone: 'bg-emerald-100 text-emerald-800', icon: FileText, bg: 'bg-emerald-50', color: 'text-emerald-600' },
-  { label: 'Active Doctors', value: '38', badge: 'Stable', badgeTone: 'bg-slate-100 text-slate-500', icon: Stethoscope, bg: 'bg-sky-50', color: 'text-sky-600' },
-  { label: 'Departments', value: '9', badge: '1 New', badgeTone: 'bg-amber-100 text-amber-800', icon: Building2, bg: 'bg-amber-50', color: 'text-amber-600' },
-  { label: 'of 2 TB used', value: '640 GB', badge: '32%', badgeTone: 'bg-violet-100 text-violet-800', icon: Cloud, bg: 'bg-violet-50', color: 'text-violet-600', progress: 32, progressColor: '#7c3aed' },
-  { label: 'Security Score', value: '94/100', badge: 'Excellent', badgeTone: 'bg-emerald-100 text-emerald-800', icon: ShieldCheck, bg: 'bg-emerald-50', color: 'text-emerald-600', progress: 94, progressColor: '#059669' },
+// No dedicated /dashboard/stats route exists on the real backend (confirmed —
+// no dashboard blueprint in his source). Patients/Records/Doctors counts
+// below are computed live from the real GET /patients, GET /records, and
+// GET /auth/users routes instead of being fabricated. Departments, Storage,
+// and Security Score have no real backend basis at all yet and stay
+// clearly labeled as demo/sample rather than pretending to be real.
+
+const demoKpis = [
+  { label: 'Departments (demo)', value: '9', badge: '1 New', badgeTone: 'bg-amber-100 text-amber-800', icon: Building2, bg: 'bg-amber-50', color: 'text-amber-600' },
+  { label: 'of 2 TB used (demo)', value: '640 GB', badge: '32%', badgeTone: 'bg-violet-100 text-violet-800', icon: Cloud, bg: 'bg-violet-50', color: 'text-violet-600', progress: 32, progressColor: '#7c3aed' },
+  { label: 'Security Score (demo)', value: '94/100', badge: 'Excellent', badgeTone: 'bg-emerald-100 text-emerald-800', icon: ShieldCheck, bg: 'bg-emerald-50', color: 'text-emerald-600', progress: 94, progressColor: '#059669' },
 ]
 
 const storageData = [
@@ -33,13 +38,26 @@ const deptOccupancy = [
   { dept: 'Paeds', value: 68, color: '#14b8a6' },
 ]
 
-const recentActivity = [
-  { icon: UserPlus, bg: 'bg-blue-50', color: 'text-blue-600', text: 'New patient admitted — Chidinma Okoro', sub: 'Cardiology Ward · Dr. Nwachukwu', time: '2 min ago' },
-  { icon: FilePlus, bg: 'bg-emerald-50', color: 'text-emerald-600', text: 'Medical record uploaded for Obinna Eze', sub: 'MRI Scan · ICU · Encrypted', time: '14 min ago' },
-  { icon: FlaskConical, bg: 'bg-amber-50', color: 'text-amber-600', text: 'Lab results ready — Tunde Adewale', sub: 'Blood panel · Neurology · Ref: LAB-2847', time: '38 min ago' },
-  { icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', text: 'Critical alert — Obinna Eze', sub: 'O2 saturation below threshold · ICU Bed 4', time: '1 hr ago' },
-  { icon: UserCheck, bg: 'bg-violet-50', color: 'text-violet-600', text: 'Patient discharged — Aisha Bello', sub: 'Orthopaedics · Dr. Ibrahim Yusuf · Ref: #PT-003', time: '2 hr ago' },
-]
+const activityIcon = {
+  'Login Success': { icon: UserCheck, bg: 'bg-emerald-50', color: 'text-emerald-600' },
+  'Login Failed': { icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600' },
+  'Account Locked': { icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600' },
+  'Record Viewed': { icon: FileText, bg: 'bg-violet-50', color: 'text-violet-600' },
+  'Record Uploaded': { icon: FilePlus, bg: 'bg-emerald-50', color: 'text-emerald-600' },
+  'Patient Created': { icon: UserPlus, bg: 'bg-blue-50', color: 'text-blue-600' },
+  'User Created': { icon: UserPlus, bg: 'bg-blue-50', color: 'text-blue-600' },
+}
+
+function timeAgo(timestamp) {
+  if (!timestamp) return ''
+  const diffMs = Date.now() - new Date(timestamp).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hr ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 const quickActions = [
   { icon: UserPlus, label: 'Register New Patient', primary: true, to: '/patients/new' },
@@ -75,10 +93,56 @@ export default function Dashboard() {
   const [monthMenuOpen, setMonthMenuOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('Jul')
 
+  // Real counts — no dedicated stats route exists, so these are computed
+  // from the same real endpoints the Patients/Records/Users pages already use.
+  const [counts, setCounts] = useState({ patients: null, records: null, doctors: null })
+  const [countsLoading, setCountsLoading] = useState(true)
+  const [recentActivity, setRecentActivity] = useState([])
+  const [activityLoading, setActivityLoading] = useState(true)
+
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    Promise.allSettled([api.getPatients(), api.getRecords(), api.getStaff()])
+      .then(([patientsRes, recordsRes, staffRes]) => {
+        setCounts({
+          patients: patientsRes.status === 'fulfilled' ? (patientsRes.value || []).length : null,
+          records: recordsRes.status === 'fulfilled' ? (recordsRes.value || []).length : null,
+          doctors: staffRes.status === 'fulfilled' ? (staffRes.value || []).filter((s) => s.role === 'doctor').length : null,
+        })
+      })
+      .finally(() => setCountsLoading(false))
+
+    // Audit logs require admin/auditor role — a non-privileged user simply
+    // won't see recent activity here, which is expected, not a bug.
+    api
+      .getAuditLogs({ limit: 5 })
+      .then((data) => setRecentActivity(data || []))
+      .catch(() => setRecentActivity([]))
+      .finally(() => setActivityLoading(false))
+  }, [])
+
+  const kpis = [
+    {
+      label: 'Total Patients',
+      value: countsLoading ? '—' : counts.patients ?? '—',
+      icon: Users, bg: 'bg-blue-50', color: 'text-blue-600',
+    },
+    {
+      label: 'Medical Records',
+      value: countsLoading ? '—' : counts.records ?? '—',
+      icon: FileText, bg: 'bg-teal-50', color: 'text-teal-600',
+    },
+    {
+      label: 'Active Doctors',
+      value: countsLoading ? '—' : counts.doctors ?? '—',
+      icon: Stethoscope, bg: 'bg-violet-50', color: 'text-violet-600',
+    },
+    ...demoKpis,
+  ]
 
   const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -124,7 +188,7 @@ export default function Dashboard() {
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${k.bg}`}>
                 <k.icon size={18} className={k.color} />
               </div>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${k.badgeTone}`}>{k.badge}</span>
+              {k.badge && <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${k.badgeTone}`}>{k.badge}</span>}
             </div>
             <div className="text-2xl font-display font-bold text-slate-800">{k.value}</div>
             <div className="text-xs text-slate-500 mt-0.5">{k.label}</div>
@@ -211,18 +275,27 @@ export default function Dashboard() {
             <button onClick={() => navigate('/audit')} className="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-600">View All</button>
           </div>
           <div className="flex flex-col">
-            {recentActivity.map((item, i) => (
-              <div key={i} className="flex items-start gap-3 border-b border-slate-100 last:border-0" style={{ padding: '10px 0' }}>
-                <div className={`rounded-lg flex items-center justify-center flex-shrink-0 ${item.bg}`} style={{ width: 34, height: 34 }}>
-                  <item.icon size={16} className={item.color} />
+            {activityLoading && (
+              <div className="text-center text-sm text-slate-400 py-8"><Loader2 size={16} className="animate-spin inline-block mr-2" />Loading...</div>
+            )}
+            {!activityLoading && recentActivity.length === 0 && (
+              <div className="text-center text-sm text-slate-400 py-8">No recent activity to show — this requires admin or auditor access.</div>
+            )}
+            {!activityLoading && recentActivity.map((log) => {
+              const a = activityIcon[log.action] || { icon: FileText, bg: 'bg-slate-100', color: 'text-slate-600' }
+              return (
+                <div key={log.id} className="flex items-start gap-3 border-b border-slate-100 last:border-0" style={{ padding: '10px 0' }}>
+                  <div className={`rounded-lg flex items-center justify-center flex-shrink-0 ${a.bg}`} style={{ width: 34, height: 34 }}>
+                    <a.icon size={16} className={a.color} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[13.5px] font-medium text-slate-800">{log.action} — {log.user_name}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{log.role_at_time}{log.record_id ? ` · ${log.record_id}` : ''}</div>
+                  </div>
+                  <div className="text-[11.5px] text-slate-400 whitespace-nowrap">{timeAgo(log.timestamp)}</div>
                 </div>
-                <div className="flex-1">
-                  <div className="text-[13.5px] font-medium text-slate-800">{item.text}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">{item.sub}</div>
-                </div>
-                <div className="text-[11.5px] text-slate-400 whitespace-nowrap">{item.time}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
 

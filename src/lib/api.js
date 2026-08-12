@@ -112,32 +112,38 @@ export const api = {
   },
 
   // ---------- Patients ----------
+  // Real routes confirmed in the updated contract (dts302_api_contract v3):
+  // GET /patients, GET /patients/{id}, PATCH /patients/{id} now genuinely
+  // exist — no more local-cache workaround needed.
 
-  getPatients: async () => {
+  getPatients: async ({ search, hospitalId } = {}) => {
     if (USE_MOCK_DATA) return patients
-    // Not a dedicated list-patients route in the contract — patients surface
-    // through GET /records (patient_name per record). Adjust here once/if a
-    // direct GET /records/patients listing route is confirmed.
-    const data = await request('/records')
-    return data.records
+    const data = await request(`/patients${qs({ search, hospital_id: hospitalId })}`)
+    return data.patients
   },
 
   getPatientById: async (id) => {
     if (USE_MOCK_DATA) return patients.find((p) => p.id === id)
-    return request(`/records/${id}`)
+    return request(`/patients/${id}`)
+  },
+
+  updatePatient: async (id, fields) => {
+    // fields: any of first_name, last_name, age, gender, phone, address, assigned_doctor_id
+    if (USE_MOCK_DATA) return { id, ...fields, message: 'Patient updated (mock)' }
+    return request(`/patients/${id}`, { method: 'PATCH', body: JSON.stringify(fields) })
   },
 
   createPatient: async (payload) => {
-    // payload: first_name, last_name (or full_name), age, gender?, phone?, address?,
+    // payload: first_name, last_name, age, gender?, phone?, address?,
     // national_id?, assigned_doctor_id?, portal_email?, portal_password?
     // Both portal_email and portal_password must be present together or neither is used.
     if (USE_MOCK_DATA) return { patient_id: 'mock-id', hospital_id: 'MR-000000', message: 'Patient record created (mock)' }
-    return request('/records/patients', { method: 'POST', body: JSON.stringify(payload) })
+    return request('/patients', { method: 'POST', body: JSON.stringify(payload) })
   },
 
   createPortalAccount: async (patientId, portalEmail, portalPassword) => {
     if (USE_MOCK_DATA) return { user_id: 0, patient_id: patientId, message: 'Portal account created and linked (mock)' }
-    return request(`/records/patients/${patientId}/portal-account`, {
+    return request(`/patients/${patientId}/portal-account`, {
       method: 'POST',
       body: JSON.stringify({ portal_email: portalEmail, portal_password: portalPassword }),
     })

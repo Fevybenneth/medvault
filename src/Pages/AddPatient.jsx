@@ -4,10 +4,9 @@ import { User, Calendar, Phone, MapPin, Fingerprint, Stethoscope, Mail, Lock } f
 import { Card } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { api } from '../lib/api'
-import { addKnownPatient } from '../lib/localPatients'
 
-// Fields here mirror POST /records/patients from the backend contract
-// (dts302_api_contract, MedVault Group 4). Blood group / department were
+// Fields here mirror POST /patients from the backend contract
+// (dts302_api_contract v3, MedVault Group 4). Blood group / department were
 // dropped since the backend doesn't accept them for patient creation.
 export default function AddPatient() {
   const navigate = useNavigate()
@@ -55,21 +54,9 @@ export default function AddPatient() {
 
     setSubmitting(true)
     try {
-      const result = await api.createPatient(payload)
-      // Cache the real id so the Upload page (and eventually Patients page)
-      // can pick a real patient instead of a fake mock one — see localPatients.js
-      addKnownPatient({
-        id: result?.patient_id,
-        hospitalId: result?.hospital_id,
-        name: `${form.firstName} ${form.lastName}`.trim(),
-        firstName: form.firstName,
-        lastName: form.lastName,
-        age: form.age,
-        gender: form.gender,
-        phone: form.phone,
-        address: form.address,
-        nationalId: form.nationalId,
-      })
+      await api.createPatient(payload)
+      // No more local caching needed — GET /patients is a real route now,
+      // so the Patients page will just fetch this patient properly.
       showToast(`${form.firstName || 'New patient'} ${form.lastName || ''} registered successfully`.trim())
       navigate('/patients')
     } catch (err) {

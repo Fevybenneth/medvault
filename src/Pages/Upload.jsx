@@ -1,11 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   UploadCloud, FolderOpen, ScanLine, FileText, Image,
-  CheckCircle2, User, FileType, Building2, Stethoscope, Calendar, ShieldCheck, X,
+  CheckCircle2, User, FileType, Building2, Stethoscope, Calendar, ShieldCheck, X, Loader2,
 } from 'lucide-react'
 import { api } from '../lib/api'
-import { getKnownPatients } from '../lib/localPatients'
 import { Card, EncBadge, Progress } from '../components/ui'
 import { useToast } from '../components/Toast'
 
@@ -50,12 +49,27 @@ export default function Upload() {
   const user = getCurrentUser()
   const allowedTypes = UPLOAD_PERMISSIONS[user?.role] ?? RECORD_TYPES // fall back to all when role is unknown, e.g. in dev/demo mode
 
-  // Real patients you've created via Add Patient (with real backend UUIDs) —
-  // see lib/localPatients.js for why this exists instead of a proper list route.
-  const knownPatients = getKnownPatients()
+  // Real GET /patients route now exists (contract v3) — no more local-cache workaround.
+  const [patientsList, setPatientsList] = useState([])
+  const [patientsLoading, setPatientsLoading] = useState(true)
+  const [patientsError, setPatientsError] = useState('')
+
+  useEffect(() => {
+    api
+      .getPatients()
+      .then((data) => {
+        const list = data || []
+        setPatientsList(list)
+        if (list[0]) setForm((f) => ({ ...f, patient: list[0].id }))
+      })
+      .catch((err) => {
+        setPatientsError(err instanceof TypeError ? 'Could not reach the server' : err.message || 'Could not load patients')
+      })
+      .finally(() => setPatientsLoading(false))
+  }, [])
 
   const [form, setForm] = useState({
-    patient: knownPatients[0]?.id || '',
+    patient: '',
     type: allowedTypes[0] || '',
     dept: 'Cardiology',
     doctor: user?.name || '',
@@ -112,7 +126,8 @@ export default function Upload() {
       showToast('Add at least one file before uploading', 'info')
       return
     }
-    const patientName = knownPatients.find((p) => p.id === form.patient)?.name || 'patient'
+    const found = patientsList.find((p) => p.id === form.patient)
+    const patientName = found ? `${found.first_name} ${found.last_name}` : 'patient'
 
     // "data" is freeform clinical content per the contract (no fixed sub-schema) —
     // this captures what the form collects. One record is created per queued file.
@@ -244,17 +259,20 @@ export default function Upload() {
                 <select
                   value={form.patient}
                   onChange={(e) => updateForm('patient', e.target.value)}
-                  disabled={knownPatients.length === 0}
+                  disabled={patientsLoading || patientsList.length === 0}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500 disabled:opacity-60"
                 >
-                  {knownPatients.length === 0 && <option value="">No patients yet — register one first</option>}
-                  {knownPatients.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                  {patientsLoading && <option value="">Loading patients...</option>}
+                  {!patientsLoading && patientsList.length === 0 && <option value="">No patients yet — register one first</option>}
+                  {patientsList.map((p) => (
+                    <option key={p.id} value={p.id}>{p.first_name} {p.last_name} ({p.hospital_id})</option>
                   ))}
                 </select>
+                {patientsLoading && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />}
               </div>
-              {knownPatients.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1.5">No real patients found yet. Register one via Add Patient first — a listing route doesn't exist on the backend yet, so only patients you've created this session show up here.</p>
+              {patientsError && <p className="text-xs text-red-500 mt-1.5">{patientsError}</p>}
+              {!patientsLoading && !patientsError && patientsList.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1.5">No patients found yet. Register one via Add Patient first.</p>
               )}
             </div>
             <div>
