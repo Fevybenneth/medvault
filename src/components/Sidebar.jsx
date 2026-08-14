@@ -4,6 +4,7 @@ import {
   BarChart2, ShieldCheck, UserCog, Settings, LogOut, X,
 } from 'lucide-react'
 import { hospital } from '../lib/mockData'
+import { api } from '../lib/api'
 
 const allNavItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', section: 'MAIN' },
@@ -37,10 +38,16 @@ export default function Sidebar({ user, isOpen, onClose }) {
   }
   const displayRole = roleLabelMap[user?.role] || user?.role || 'Guest'
 
-  const handleSignOut = () => {
-    localStorage.removeItem('medvault_token')
-    localStorage.removeItem('medvault_user')
-    navigate('/login')
+  const handleSignOut = async () => {
+      try{
+          await api.logout()
+      } catch {
+          // Backend call failed or token already invalid — still clear
+          // local state and redirect, don't trap the user on the page.
+      }
+      localStorage.removeItem('medvault_token')
+      localStorage.removeItem('medvault_user')
+      navigate('/login')
   }
 
   return (

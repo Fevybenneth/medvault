@@ -76,6 +76,13 @@ export const api = {
     localStorage.setItem('medvault_user', JSON.stringify(data.user))
     return data
   },
+  
+  logout: async () => {
+      if (USE_MOCK_DATA) return { message: 'Logged out (mock)' }
+      return request('/auth/logout', { method: 'POST' })
+  },
+
+
 
   getMyProfile: async () => {
     if (USE_MOCK_DATA) return null
@@ -118,7 +125,7 @@ export const api = {
 
   getPatients: async ({ search, hospitalId } = {}) => {
     if (USE_MOCK_DATA) return patients
-    const data = await request(`/patients${qs({ search, hospital_id: hospitalId })}`)
+    const data = await request(`/patients/${qs({ search, hospital_id: hospitalId })}`)
     return data.patients
   },
 
@@ -138,7 +145,7 @@ export const api = {
     // national_id?, assigned_doctor_id?, portal_email?, portal_password?
     // Both portal_email and portal_password must be present together or neither is used.
     if (USE_MOCK_DATA) return { patient_id: 'mock-id', hospital_id: 'MR-000000', message: 'Patient record created (mock)' }
-    return request('/patients', { method: 'POST', body: JSON.stringify(payload) })
+    return request('/patients/', { method: 'POST', body: JSON.stringify(payload) })
   },
 
   createPortalAccount: async (patientId, portalEmail, portalPassword) => {
@@ -154,7 +161,7 @@ export const api = {
   getRecords: async ({ page, limit, patientId, recordType, dateFrom, dateTo } = {}) => {
     if (USE_MOCK_DATA) return records
     const data = await request(
-      `/records${qs({ page, limit, patient_id: patientId, record_type: recordType, date_from: dateFrom, date_to: dateTo })}`
+      `/records/${qs({ page, limit, patient_id: patientId, record_type: recordType, date_from: dateFrom, date_to: dateTo })}`
     )
     return data.records
   },

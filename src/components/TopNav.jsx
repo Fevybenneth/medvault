@@ -3,18 +3,27 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Bell, MessageSquare, HelpCircle, ChevronDown, UserCircle, Settings, LogOut, Menu } from 'lucide-react'
 import { useToast } from './Toast'
 import { getAvatarUrl } from '../lib/avatar'
+import { api } from '../lib/api'
 
 export default function TopNav({ user, onMenuClick }) {
-  const showToast = useToast()
-  const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const name = user?.name || 'Dr. Emeka Nwachukwu'
-  const dept = user?.dept || 'Cardiology'
+    const showToast = useToast()
+    const navigate = useNavigate()
+    const [menuOpen, setMenuOpen] = useState(false)
+    const name = user?.first_name
+    ? (user.role === 'doctor' ? `Dr. ${user.first_name} ${user.last_name}` : `${user.first_name} ${user.last_name}`)
+    : 'Guest'
+    const dept = user?.department || null
+  
 
-  const handleSignOut = () => {
-    localStorage.removeItem('medvault_token')
-    localStorage.removeItem('medvault_user')
-    navigate('/login')
+  const handleSignOut = async () => {
+      try {
+          await api.logout()
+      } catch {
+          // waits for backend
+      }
+      localStorage.removeItem('medvault_token')
+      localStorage.removeItem('medvault_user')
+      navigate('/login')
   }
 
   return (
@@ -63,13 +72,13 @@ export default function TopNav({ user, onMenuClick }) {
           />
           <div className="hidden md:block">
             <div className="text-[13px] font-semibold text-slate-800 whitespace-nowrap">{name}</div>
-            <div className="text-[11px] text-slate-400">{dept}</div>
+            {dept && <div className="text-[11px] text-slate-400">{dept}</div>}
           </div>
           <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
         </div>
 
         {menuOpen && (
-          <>
+          <div>
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-0 top-12 bg-white border border-slate-200 rounded-lg shadow-lg z-20" style={{ width: 200, padding: 6 }}>
               <button
@@ -95,7 +104,7 @@ export default function TopNav({ user, onMenuClick }) {
                 Sign Out
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
