@@ -121,11 +121,27 @@ export default function Settings() {
     setSaving(true)
     try {
       await api.updateMyProfile({ phone: profile.phone, department: profile.department })
+
+      // updateMyProfile doesn't touch localStorage itself — Sidebar/TopNav/App
+      // all read the cached medvault_user, so without this the new phone/department
+      // won't show up anywhere else in the app until the next full login.
+      try {
+        const cached = JSON.parse(localStorage.getItem('medvault_user') || 'null')
+        if (cached) {
+          localStorage.setItem('medvault_user', JSON.stringify({
+            ...cached,
+            phone: profile.phone,
+            department: profile.department,
+          }))
+        }
+      } catch {
+        // corrupt cache — not worth failing the save over, next login will fix it
+      }
+
       setSaved(true)
       showToast('Profile updated')
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
-      showToast(err.message || 'Could not save profile — please try again', 'info')
     } finally {
       setSaving(false)
     }

@@ -40,13 +40,13 @@ function AppLayout({ children }) {
   )
 }
 
-function AdminOnly({ children, message }) {
+function RoleGuard({ children, allowedRoles, message }) {
   const user = getCurrentUser()
   const showToast = useToast()
   const [redirect, setRedirect] = useState(false)
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    if (!user || !allowedRoles.includes(user.role)) {
       showToast(message, 'info')
       setRedirect(true)
     }
@@ -74,9 +74,9 @@ function App() {
         path="/audit"
         element={
           <AppLayout>
-            <AdminOnly message="Audit Logs is restricted to administrators">
+            <RoleGuard allowedRoles={['admin', 'auditor']} message="Audit Logs is restricted to administrators and auditors">
               <Audit />
-            </AdminOnly>
+            </RoleGuard>
           </AppLayout>
         }
       />
@@ -84,9 +84,9 @@ function App() {
         path="/users"
         element={
           <AppLayout>
-            <AdminOnly message="User Management is restricted to administrators">
+            <RoleGuard allowedRoles={['admin']} message="User Management is restricted to administrators">
               <Users />
-            </AdminOnly>
+            </RoleGuard>
           </AppLayout>
         }
       />

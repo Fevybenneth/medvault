@@ -131,13 +131,14 @@ export default function Upload() {
 
     // "data" is freeform clinical content per the contract (no fixed sub-schema) —
     // this captures what the form collects. One record is created per queued file.
-    const clinicalData = { department: form.dept, doctor: form.doctor, date: form.date, notes: form.notes }
+    const clinicalData = { doctor: form.doctor, date: form.date, notes: form.notes }
 
     setSubmitting(true)
     try {
       for (const item of queue) {
         await api.uploadRecord({
           patientId: form.patient,
+          department: form.dept,
           recordType: form.type,
           data: clinicalData,
           file: item.file,

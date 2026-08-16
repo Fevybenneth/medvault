@@ -170,16 +170,17 @@ export const api = {
 
   // formFields: { patient_id, record_type, data } — `data` will be JSON.stringified.
   // file is optional.
-  uploadRecord: async ({ patientId, recordType, data, file }) => {
+  uploadRecord: async ({ patientId, recordType, department, data, file }) => {
     if (USE_MOCK_DATA) return { record_id: 'MR-NEW', checksum: 'mock', message: 'Record uploaded successfully. (mock)' }
     const formData = new FormData()
     formData.append('patient_id', patientId)
     formData.append('record_type', recordType)
+    if (department) formData.append('department', department)
     formData.append('data', JSON.stringify(data))
     if (file) formData.append('file', file)
     return request('/records/upload', { method: 'POST', body: formData })
   },
-
+  
   // Only works on a record that doesn't already have a file attached —
   // this route cannot replace an existing file.
   attachFileToRecord: async (recordId, file) => {
