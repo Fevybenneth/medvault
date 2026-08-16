@@ -89,7 +89,7 @@ export default function Audit() {
       .getAuditLogs()
       .then((data) => {
         if (cancelled) return
-        const mapped = (data || []).map((l) => ({
+        const mapped = (data?.logs || []).map((l) => ({
           id: l.id,
           user: l.user_name,
           role: l.role_at_time,

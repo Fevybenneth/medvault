@@ -58,7 +58,7 @@ export default function Upload() {
     api
       .getPatients()
       .then((data) => {
-        const list = data || []
+        const list = data?.patients || []
         setPatientsList(list)
         if (list[0]) setForm((f) => ({ ...f, patient: list[0].id }))
       })

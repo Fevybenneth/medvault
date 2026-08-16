@@ -141,6 +141,7 @@ export default function Users() {
   const [showCreate, setShowCreate] = useState(false)
 
   const [staff, setStaff] = useState([])
+  const [totalStaff, setTotalStaff] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -150,7 +151,7 @@ export default function Users() {
     api
       .getStaff()
       .then((data) => {
-        const mapped = (data || []).map((u) => ({
+        const mapped = (data?.users || []).map((u) => ({
           id: u.id,
           name: `${u.first_name} ${u.last_name}`,
           email: u.email,
@@ -161,6 +162,7 @@ export default function Users() {
           status: u.is_locked ? 'Locked' : u.is_active ? 'Active' : 'Inactive',
         }))
         setStaff(mapped)
+        setTotalStaff(data?.total || 0);
       })
       .catch((err) => {
         if (err instanceof TypeError) {
@@ -184,7 +186,7 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl font-display font-bold text-slate-800">User Management</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{staff.length} staff accounts</p>
+          <p className="text-sm text-slate-500 mt-0.5">{totalStaff} staff accounts</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => showToast('Export coming soon', 'info')}><Download size={14} />Export</Button>
@@ -195,7 +197,7 @@ export default function Users() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-4">
         <Card className="p-5 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center"><UsersIcon size={18} className="text-blue-600" /></div>
-          <div><div className="text-[22px] font-display font-bold text-slate-800">{staff.length}</div><div className="text-xs text-slate-500">Total Staff</div></div>
+          <div><div className="text-[22px] font-display font-bold text-slate-800">{totalStaff}</div><div className="text-xs text-slate-500">Total Staff</div></div>
         </Card>
         <Card className="p-5 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center"><Stethoscope size={18} className="text-blue-700" /></div>

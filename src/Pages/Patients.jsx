@@ -36,7 +36,7 @@ export default function Patients() {
     setLoadError('')
     api
       .getPatients({ search: searchTerm || undefined })
-      .then((data) => setPatientsList(data || []))
+      .then((data) => setPatientsList(data?.patients || []))
       .catch((err) => {
         if (err instanceof TypeError) {
           setLoadError('Could not reach the server — it may be waking up, try refreshing shortly')

@@ -102,8 +102,7 @@ export const api = {
 
   getStaff: async ({ page, limit } = {}) => {
     if (USE_MOCK_DATA) return staff
-    const data = await request(`/auth/users${qs({ page, limit })}`)
-    return data.users
+    return request(`/auth/users${qs({ page, limit })}`)
   },
 
   createStaffAccount: async (payload) => {
@@ -125,8 +124,7 @@ export const api = {
 
   getPatients: async ({ search, hospitalId } = {}) => {
     if (USE_MOCK_DATA) return patients
-    const data = await request(`/patients/${qs({ search, hospital_id: hospitalId })}`)
-    return data.patients
+    return request(`/patients/${qs({ search, hospital_id: hospitalId })}`)
   },
 
   getPatientById: async (id) => {
@@ -160,10 +158,9 @@ export const api = {
 
   getRecords: async ({ page, limit, patientId, recordType, dateFrom, dateTo } = {}) => {
     if (USE_MOCK_DATA) return records
-    const data = await request(
+    return request(
       `/records/${qs({ page, limit, patient_id: patientId, record_type: recordType, date_from: dateFrom, date_to: dateTo })}`
     )
-    return data.records
   },
 
   getRecordById: async (recordId) => {
@@ -196,10 +193,9 @@ export const api = {
 
   getAuditLogs: async ({ page, limit, userId, action, status, dateFrom, dateTo } = {}) => {
     if (USE_MOCK_DATA) return auditLogs
-    const data = await request(
+    return request(
       `/audit/logs${qs({ page, limit, user_id: userId, action, status, date_from: dateFrom, date_to: dateTo })}`
     )
-    return data.logs
   },
 
   getAuditReport: async (recordId) => {

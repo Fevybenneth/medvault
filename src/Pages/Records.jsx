@@ -57,6 +57,7 @@ export default function Records() {
   const [dateTo, setDateTo] = useState('')
 
   const [records, setRecords] = useState([])
+  const [totalRecords, setTotalRecords] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -72,7 +73,7 @@ export default function Records() {
         // Note: the contract's GET /records response has no patient_id per
         // record (only patient_name), so linking a row to a patient profile
         // isn't possible yet — worth asking him to add patient_id here.
-        const mapped = (data || []).map((r) => ({
+        const mapped = (data?.records || []).map((r) => ({
           id: r.id,
           patient: r.patient_name,
           patientId: r.patient_id || null,
@@ -83,6 +84,7 @@ export default function Records() {
           size: formatBytes(r.file_size),
         }))
         setRecords(mapped)
+        setTotalRecords(data?.total || 0);
       })
       .catch((err) => {
         if (cancelled) return
@@ -114,7 +116,7 @@ export default function Records() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl font-display font-bold text-slate-800">Medical Records</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{records.length} records · All encrypted with AES-256</p>
+          <p className="text-sm text-slate-500 mt-0.5">{totalRecords} records · All encrypted with AES-256</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           <EncBadge className="text-xs" />
