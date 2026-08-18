@@ -119,19 +119,37 @@ export function AuthProvider({ children }) {
   }, []);
 
   const role = user?.role || user?.role_name || user?.role?.role_name || null;
+  const permissions = user?.permissions || user?.role?.permissions || [];
+
+  const hasPermission = (permission) => {
+    if (!permission) return true;
+
+    return permissions.includes(permission);
+  };
+
+  const hasAnyPermission = (requiredPermissions = []) => {
+    if (!requiredPermissions.length) return true;
+
+    return requiredPermissions.some((permission) =>
+      permissions.includes(permission)
+    );
+  };
 
   const value = useMemo(
     () => ({
       user,
       role,
+      permissions,
       token,
       loading,
       isAuthenticated: Boolean(token && user),
       login,
       logout,
       refreshUser,
+      hasPermission,
+      hasAnyPermission
     }),
-    [user, role, token, loading],
+    [ user, role, permissions, token, loading ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

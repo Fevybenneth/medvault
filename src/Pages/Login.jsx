@@ -4,10 +4,12 @@ import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowLeft } from 'lucide-react'
 import { hospital } from '../lib/mockData'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate()
   const showToast = useToast()
+  const { login } = useAuth();
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -24,7 +26,7 @@ export default function Login() {
     setLoading(true)
 
     try {
-      await api.login(email, password)
+      await login(email, password)
       navigate('/dashboard')
     } catch (err) {
       if (err instanceof TypeError) {
