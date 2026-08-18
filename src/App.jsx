@@ -19,19 +19,45 @@ import Settings from "./Pages/Settings";
 import ErrorPage from "./Pages/ErrorPage";
 
 function AppLayout({ children }) {
-  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [sidebarPinned, setSidebarPinned] = useState(() => {
+    const saved = localStorage.getItem("medvault_sidebar_pinned");
+
+    return saved === null ? true : saved === "true";
+  });
+
+  const handleTogglePin = () => {
+    setSidebarPinned((current) => {
+      const next = !current;
+
+      localStorage.setItem("medvault_sidebar_pinned", String(next));
+
+      return next;
+    });
+  };
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopNav onMenuClick={() => setSidebarOpen(true)} />
-        <div className="flex-1 p-3 sm:p-6 overflow-y-auto">{children}</div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="flex min-h-screen">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          pinned={sidebarPinned}
+          onTogglePin={handleTogglePin}
+        />
+
+        <div className="flex-1 min-w-0 flex flex-col">
+          <TopNav onMenuClick={() => setSidebarOpen(true)} />
+
+          <main className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );
 }
-
 // Wraps any authenticated route. Waits for session validation to finish
 // before judging, so a page refresh can't produce a false "not logged in"
 // redirect while /auth/me is still resolving.

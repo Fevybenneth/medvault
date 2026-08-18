@@ -33,10 +33,24 @@ export default function TopNav({ onMenuClick }) {
   return (
     <div className="h-15 bg-white border-b border-slate-200 flex items-center px-3 sm:px-6 gap-2 sm:gap-3 relative">
       <button
+        type="button"
         onClick={onMenuClick}
-        className="lg:hidden w-9 h-9 flex items-center justify-center text-slate-600 flex-shrink-0"
+        aria-label="Open navigation"
+        className="
+    lg:hidden
+    w-9
+    h-9
+    flex
+    items-center
+    justify-center
+    rounded-lg
+    text-slate-600
+    hover:bg-slate-100
+    transition-colors
+    flex-shrink-0
+  "
       >
-        <Menu size={20} />
+        <Menu size={19} />
       </button>
 
       <div className="relative flex-1 max-w-xs hidden sm:block">
