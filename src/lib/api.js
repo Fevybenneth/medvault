@@ -1,212 +1,233 @@
-import { patients, records, staff, auditLogs, admissionsByMonth } from './mockData'
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-// Backend is live on Render: https://medvault-backend-vw9j.onrender.com
-// Set VITE_API_URL in your .env / .env.local to that value (do not commit .env.local).
-// Note: Render free tier spins down after inactivity — the first request after
-// idle time can take 50+ seconds to respond while the instance wakes up.
-const BASE_URL = import.meta.env.VITE_API_URL
+const TOKEN_KEY = "medvault_token";
 
-// Auth + patients + records + audit are all confirmed working against the
-// backend contract as of Aug 2 2026. Flip per-section as you verify each screen,
-// or flip this off globally once everything's been clicked through for real.
-const USE_MOCK_DATA = false
+const getToken = () => localStorage.getItem(TOKEN_KEY);
 
-// Messages the backend contract calls out as needing an automatic logout,
-// rather than just being shown as a normal error toast.
-const FORCE_LOGOUT_MESSAGES = [
-  'Account is no longer active.',
-  'Your session has expired. Please log in again.',
-]
+const clearAuth = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("medvault_user");
+};
 
-function clearSessionAndRedirect() {
-  localStorage.removeItem('medvault_token')
-  localStorage.removeItem('medvault_user')
-  if (typeof window !== 'undefined') window.location.href = '/login'
-}
+const request = async (path, options = {}) => {
+  const token = getToken();
 
-async function request(path, options = {}) {
-  const token = localStorage.getItem('medvault_token')
-  const isFormData = options.body instanceof FormData
+  const headers = {
+    ...(options.body instanceof FormData
+      ? {}
+      : { "Content-Type": "application/json" }),
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: {
-      // Don't set Content-Type for FormData — the browser needs to add its own
-      // multipart boundary, and a hardcoded 'application/json' here would break uploads.
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
+    headers,
+  });
 
-  const data = await res.json().catch(() => ({}))
+  let data = null;
 
-  if (!res.ok) {
-    const message = data.error || `API error: ${res.status}`
-    if (FORCE_LOGOUT_MESSAGES.includes(message)) {
-      clearSessionAndRedirect()
-    }
-    throw new Error(message)
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
   }
 
-  return data
-}
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuth();
+    }
 
-function qs(params = {}) {
-  const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
-  if (entries.length === 0) return ''
-  return '?' + new URLSearchParams(entries).toString()
-}
+    const error = new Error(
+      data?.error || data?.message || "An unexpected error occurred."
+    );
+
+    error.status = response.status;
+    error.data = data;
+
+    throw error;
+  }
+
+  return data;
+};
 
 export const api = {
-  // ---------- Auth ----------
+  // ─────────────────────────────────────────────
+  // Authentication
+  // ─────────────────────────────────────────────
 
-  login: async (email, password, demoRole = 'doctor') => {
-    const demoUsers = {
-      doctor: { name: 'Dr. Emeka Nwachukwu', role: 'doctor', roleLabel: 'Consultant', dept: 'Cardiology', email: 'e.nwachukwu@amaku.gov.ng' },
-      admin: { name: 'Dr. Adaeze Nwosu', role: 'admin', roleLabel: 'Admin / HOD', dept: 'ICU', email: 'a.nwosu@amaku.gov.ng' },
-      nurse: { name: 'Nurse Ifeoma Adeyemi', role: 'nurse', roleLabel: 'Senior Nurse', dept: 'Cardiology', email: 'i.adeyemi@amaku.gov.ng' },
-    }
-    if (USE_MOCK_DATA) return { token: 'mock-token', user: demoUsers[demoRole] }
+  login: async (email, password) =>
+    request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
 
-    // Note: any role selector in the login UI is cosmetic only — the backend
-    // ignores whatever role is sent and always uses the account's real role.
-    const data = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
-    localStorage.setItem('medvault_token', data.token)
-    localStorage.setItem('medvault_user', JSON.stringify(data.user))
-    return data
-  },
-  
-  logout: async () => {
-      if (USE_MOCK_DATA) return { message: 'Logged out (mock)' }
-      return request('/auth/logout', { method: 'POST' })
-  },
+  logout: async () =>
+    request("/auth/logout", {
+      method: "POST",
+    }),
 
+  getCurrentUser: async () =>
+    request("/auth/me", {
+      method: "GET",
+    }),
 
+  updateCurrentUser: async (payload) =>
+    request("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
 
-  getMyProfile: async () => {
-    if (USE_MOCK_DATA) return null
-    return request('/auth/me')
-  },
+  // ─────────────────────────────────────────────
+  // Dashboard / System
+  // ─────────────────────────────────────────────
 
-  // Only phone and department are self-editable. At least one is required.
-  updateMyProfile: async ({ phone, department }) => {
-    if (USE_MOCK_DATA) return { message: 'Profile updated (mock)' }
-    return request('/auth/me', {
-      method: 'PATCH',
-      body: JSON.stringify({ ...(phone ? { phone } : {}), ...(department ? { department } : {}) }),
-    })
-  },
+  getSystemHealth: async () =>
+    request("/system/health", {
+      method: "GET",
+    }),
 
-  // ---------- Admin: staff user management ----------
+  getStaffStats: async () =>
+    request("/auth/users/stats", {
+      method: "GET",
+    }),
 
-  getStaff: async ({ page, limit } = {}) => {
-    if (USE_MOCK_DATA) return staff
-    return request(`/auth/users${qs({ page, limit })}`)
-  },
+  getRecordStats: async () =>
+    request("/records/stats", {
+      method: "GET",
+    }),
 
-  createStaffAccount: async (payload) => {
-    // payload: first_name, last_name, email, password, role, department?, license_number?
-    if (USE_MOCK_DATA) return { user_id: 0, message: 'Staff account created (mock)' }
-    return request('/auth/users', { method: 'POST', body: JSON.stringify(payload) })
-  },
+  getAuditStats: async () =>
+    request("/audit/logs/stats", {
+      method: "GET",
+    }),
 
-  updateStaffAccount: async (userId, fields) => {
-    // fields: any of role, is_active, is_locked, department, license_number
-    if (USE_MOCK_DATA) return { id: userId, message: 'User updated (mock)', fields_updated: Object.keys(fields) }
-    return request(`/auth/users/${userId}`, { method: 'PATCH', body: JSON.stringify(fields) })
-  },
+  // ─────────────────────────────────────────────
+  // Users / Staff
+  // ─────────────────────────────────────────────
 
-  // ---------- Patients ----------
-  // Real routes confirmed in the updated contract (dts302_api_contract v3):
-  // GET /patients, GET /patients/{id}, PATCH /patients/{id} now genuinely
-  // exist — no more local-cache workaround needed.
+  getUsers: async () =>
+    request("/auth/users", {
+      method: "GET",
+    }),
 
-  getPatients: async ({ search, hospitalId } = {}) => {
-    if (USE_MOCK_DATA) return patients
-    return request(`/patients/${qs({ search, hospital_id: hospitalId })}`)
-  },
+  createUser: async (payload) =>
+    request("/auth/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
-  getPatientById: async (id) => {
-    if (USE_MOCK_DATA) return patients.find((p) => p.id === id)
-    return request(`/patients/${id}`)
-  },
+  updateUser: async (userId, payload) =>
+    request(`/auth/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
 
-  updatePatient: async (id, fields) => {
-    // fields: any of first_name, last_name, age, gender, phone, address, assigned_doctor_id
-    if (USE_MOCK_DATA) return { id, ...fields, message: 'Patient updated (mock)' }
-    return request(`/patients/${id}`, { method: 'PATCH', body: JSON.stringify(fields) })
-  },
+  // ─────────────────────────────────────────────
+  // Patients
+  // ─────────────────────────────────────────────
 
-  createPatient: async (payload) => {
-    // payload: first_name, last_name, age, gender?, phone?, address?,
-    // national_id?, assigned_doctor_id?, portal_email?, portal_password?
-    // Both portal_email and portal_password must be present together or neither is used.
-    if (USE_MOCK_DATA) return { patient_id: 'mock-id', hospital_id: 'MR-000000', message: 'Patient record created (mock)' }
-    return request('/patients/', { method: 'POST', body: JSON.stringify(payload) })
-  },
+  getPatients: async (params = {}) => {
+    const query = new URLSearchParams();
 
-  createPortalAccount: async (patientId, portalEmail, portalPassword) => {
-    if (USE_MOCK_DATA) return { user_id: 0, patient_id: patientId, message: 'Portal account created and linked (mock)' }
-    return request(`/patients/${patientId}/portal-account`, {
-      method: 'POST',
-      body: JSON.stringify({ portal_email: portalEmail, portal_password: portalPassword }),
-    })
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, value);
+      }
+    });
+
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+
+    return request(`/patients/${suffix}`, {
+      method: "GET",
+    });
   },
 
-  // ---------- Records ----------
+  getPatient: async (patientId) =>
+    request(`/patients/${patientId}`, {
+      method: "GET",
+    }),
 
-  getRecords: async ({ page, limit, patientId, recordType, dateFrom, dateTo } = {}) => {
-    if (USE_MOCK_DATA) return records
-    return request(
-      `/records/${qs({ page, limit, patient_id: patientId, record_type: recordType, date_from: dateFrom, date_to: dateTo })}`
-    )
+  createPatient: async (payload) =>
+    request("/patients/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updatePatient: async (patientId, payload) =>
+    request(`/patients/${patientId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  createPatientPortalAccount: async (patientId, payload) =>
+    request(`/patients/${patientId}/portal-account`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // ─────────────────────────────────────────────
+  // Records
+  // ─────────────────────────────────────────────
+
+  getRecords: async (params = {}) => {
+    const query = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, value);
+      }
+    });
+
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+
+    return request(`/records/${suffix}`, {
+      method: "GET",
+    });
   },
 
-  getRecordById: async (recordId) => {
-    if (USE_MOCK_DATA) return records.find((r) => r.id === recordId)
-    return request(`/records/${recordId}`)
+  getRecord: async (recordId) =>
+    request(`/records/${recordId}`, {
+      method: "GET",
+    }),
+
+  uploadRecord: async (formData) =>
+    request("/records/upload", {
+      method: "POST",
+      body: formData,
+    }),
+
+  attachFileToRecord: async (recordId, formData) =>
+    request(`/records/${recordId}/attach-file`, {
+      method: "PATCH",
+      body: formData,
+    }),
+
+  // ─────────────────────────────────────────────
+  // Audit
+  // ─────────────────────────────────────────────
+
+  getAuditLogs: async (params = {}) => {
+    const query = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, value);
+      }
+    });
+
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+
+    return request(`/audit/logs${suffix}`, {
+      method: "GET",
+    });
   },
 
-  // formFields: { patient_id, record_type, data } — `data` will be JSON.stringified.
-  // file is optional.
-  uploadRecord: async ({ patientId, recordType, department, data, file }) => {
-    if (USE_MOCK_DATA) return { record_id: 'MR-NEW', checksum: 'mock', message: 'Record uploaded successfully. (mock)' }
-    const formData = new FormData()
-    formData.append('patient_id', patientId)
-    formData.append('record_type', recordType)
-    if (department) formData.append('department', department)
-    formData.append('data', JSON.stringify(data))
-    if (file) formData.append('file', file)
-    return request('/records/upload', { method: 'POST', body: formData })
-  },
-  
-  // Only works on a record that doesn't already have a file attached —
-  // this route cannot replace an existing file.
-  attachFileToRecord: async (recordId, file) => {
-    if (USE_MOCK_DATA) return { record_id: recordId, file_path: 'mock/path', message: 'File attached successfully. (mock)' }
-    const formData = new FormData()
-    formData.append('file', file)
-    return request(`/records/${recordId}/attach-file`, { method: 'PATCH', body: formData })
-  },
+  getAuditReport: async (recordId) =>
+    request(`/audit/report/${recordId}`, {
+      method: "GET",
+    }),
+};
 
-  // ---------- Audit (admin + auditor only) ----------
-
-  getAuditLogs: async ({ page, limit, userId, action, status, dateFrom, dateTo } = {}) => {
-    if (USE_MOCK_DATA) return auditLogs
-    return request(
-      `/audit/logs${qs({ page, limit, user_id: userId, action, status, date_from: dateFrom, date_to: dateTo })}`
-    )
-  },
-
-  getAuditReport: async (recordId) => {
-    if (USE_MOCK_DATA) return { record_id: recordId, total_accesses: 0, access_history: [] }
-    return request(`/audit/report/${recordId}`)
-  },
-
-  // ---------- Dashboard (not in backend contract yet — stays mock) ----------
-
-  getDashboardStats: async () => {
-    return { admissionsByMonth }
-  },
-}
+export { API_BASE_URL, TOKEN_KEY };
