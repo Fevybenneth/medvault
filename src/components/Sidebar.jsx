@@ -5,6 +5,7 @@ import { hospital } from "../lib/mockData";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_LABELS, getNavigationForRole } from "../config/navigation";
+import { useScrollFade } from "../lib/useScrollFade";
 
 export default function Sidebar({
   isOpen,
@@ -13,6 +14,7 @@ export default function Sidebar({
   onTogglePin,
 }) {
   const navigate = useNavigate();
+  const navScrollRef = useScrollFade();
   const { user, role, hasPermission } = useAuth();
 
   const navItems = getNavigationForRole(role).filter((item) =>
@@ -59,6 +61,7 @@ export default function Sidebar({
         className={`
           fixed
           inset-y-0
+          h-screen
           left-0
           z-50
           flex
@@ -191,68 +194,95 @@ export default function Sidebar({
         {/* =======================================================
             NAVIGATION
         ======================================================= */}
-        <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onClose}
-              title={!pinned ? item.label : undefined}
-              className={({ isActive }) =>
-                `
-                group
-                relative
-                flex
-                items-center
-                h-10
-                text-[13.5px]
-                border-l-[2.5px]
-                transition-colors
-
-                ${pinned ? "gap-2.5 px-5" : "justify-center px-0"}
-
-                ${
-                  isActive
-                    ? "text-blue-400 bg-blue-600/10 border-blue-600"
-                    : "text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5"
-                }
-                `
+        <nav
+          ref={navScrollRef}
+          className={`flex-1 py-3 overflow-x-hidden ${
+            pinned ? "overflow-y-auto scroll-fade" : "overflow-y-hidden"
+          }`}
+        >
+          {Object.entries(
+            navItems.reduce((groups, current) => {
+              const key = current.group || "";
+              if (!groups[key]) groups[key] = [];
+              groups[key].push(current);
+              return groups;
+            }, {}),
+          ).map(([groupLabel, groupItems], groupIndex) => (
+            <div
+              key={groupLabel}
+              className={
+                groupIndex > 0 ? "mt-3 pt-3 border-t border-white/5" : ""
               }
             >
-              <item.icon size={17} className="shrink-0" />
-
-              {pinned && <span className="flex-1 truncate">{item.label}</span>}
-
-              {/* Collapsed tooltip */}
-              {!pinned && (
-                <span
-                  className="
-                    pointer-events-none
-                    absolute
-                    left-[58px]
-                    z-[60]
-                    whitespace-nowrap
-                    rounded-md
-                    bg-slate-950
-                    px-2.5
-                    py-1.5
-                    text-[11px]
-                    font-medium
-                    text-white
-                    opacity-0
-                    translate-x-1
-                    group-hover:opacity-100
-                    group-hover:translate-x-0
-                    transition-all
-                  "
-                >
-                  {item.label}
-                </span>
+              {pinned && (
+                <div className="px-5 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  {groupLabel}
+                </div>
               )}
-            </NavLink>
+
+              {groupItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  title={!pinned ? item.label : undefined}
+                  className={({ isActive }) =>
+                    `
+            group
+            relative
+            flex
+            items-center
+            h-10
+            text-[13.5px]
+            border-l-[2.5px]
+            transition-colors
+
+            ${pinned ? "gap-2.5 px-5" : "justify-center px-0"}
+
+            ${
+              isActive
+                ? "text-blue-400 bg-blue-600/10 border-blue-600"
+                : "text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5"
+            }
+            `
+                  }
+                >
+                  <item.icon size={17} className="shrink-0" />
+
+                  {pinned && (
+                    <span className="flex-1 truncate">{item.label}</span>
+                  )}
+
+                  {!pinned && (
+                    <span
+                      className="
+                pointer-events-none
+                absolute
+                left-[58px]
+                z-[60]
+                whitespace-nowrap
+                rounded-md
+                bg-slate-950
+                px-2.5
+                py-1.5
+                text-[11px]
+                font-medium
+                text-white
+                opacity-0
+                translate-x-1
+                group-hover:opacity-100
+                group-hover:translate-x-0
+                transition-all
+              "
+                    >
+                      {item.label}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
-
         {/* =======================================================
             USER AREA
         ======================================================= */}

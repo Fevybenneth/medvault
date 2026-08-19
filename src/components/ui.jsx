@@ -45,8 +45,15 @@ export function Button({ variant = 'secondary', size = 'md', className = '', chi
   )
 }
 
-export function Card({ className = '', children, ...rest }) {
-  return <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`} {...rest}>{children}</div>
+export function Card({ className = "", children, ...rest }) {
+  return (
+    <div
+      className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm ${className}`}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
 }
 export function Progress({ value, className = '', color = '#2563eb' }) {
   return (

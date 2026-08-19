@@ -17,10 +17,11 @@ import Audit from "./Pages/Audit";
 import Reports from "./Pages/Reports";
 import Settings from "./Pages/Settings";
 import ErrorPage from "./Pages/ErrorPage";
+import { useScrollFade } from "./lib/useScrollFade";
 
 function AppLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
+  const mainScrollRef = useScrollFade();
   const [sidebarPinned, setSidebarPinned] = useState(() => {
     const saved = localStorage.getItem("medvault_sidebar_pinned");
 
@@ -38,8 +39,8 @@ function AppLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="flex min-h-screen">
+    <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+      <div className="flex h-screen">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -47,10 +48,10 @@ function AppLayout({ children }) {
           onTogglePin={handleTogglePin}
         />
 
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
           <TopNav onMenuClick={() => setSidebarOpen(true)} />
 
-          <main className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto">
+          <main ref={mainScrollRef} className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto">
             {children}
           </main>
         </div>

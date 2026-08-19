@@ -47,7 +47,7 @@ export default function Upload() {
   const [queue, setQueue] = useState([])
 
   const user = getCurrentUser()
-  const allowedTypes = UPLOAD_PERMISSIONS[user?.role] ?? RECORD_TYPES // fall back to all when role is unknown, e.g. in dev/demo mode
+  const allowedTypes = UPLOAD_PERMISSIONS[user?.role] ?? [];
 
   // Real GET /patients route now exists (contract v3) — no more local-cache workaround.
   const [patientsList, setPatientsList] = useState([])
@@ -136,13 +136,15 @@ export default function Upload() {
     setSubmitting(true)
     try {
       for (const item of queue) {
-        await api.uploadRecord({
-          patientId: form.patient,
-          department: form.dept,
-          recordType: form.type,
-          data: clinicalData,
-          file: item.file,
-        })
+        const formData = new FormData();
+
+        formData.append("patient_id", form.patient);
+        formData.append("department", form.dept);
+        formData.append("record_type", form.type);
+        formData.append("data", JSON.stringify(clinicalData));
+        formData.append("file", item.file);
+
+        await api.uploadRecord(formData);
       }
       showToast(`${form.type} uploaded and encrypted for ${patientName}`)
       navigate('/records')

@@ -50,7 +50,7 @@ function CreateUserModal({ onClose, onCreated }) {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await api.createStaffAccount({
+      await api.createUser({
         first_name: form.firstName,
         last_name: form.lastName,
         email: form.email,
@@ -149,7 +149,7 @@ export default function Users() {
     setLoading(true)
     setLoadError('')
     api
-      .getStaff()
+      .getUsers()
       .then((data) => {
         const mapped = (data?.users || []).map((u) => ({
           id: u.id,

@@ -57,7 +57,7 @@ export default function PatientProfile() {
     setLoading(true)
     setLoadError('')
     api
-      .getPatientById(id)
+      .getPatient(id)
       .then((data) => !cancelled && setPatient(data))
       .catch((err) => {
         if (cancelled) return

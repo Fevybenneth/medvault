@@ -9,3 +9,26 @@ html, body, #root {
 body {
   font-family: 'Inter', sans-serif;
 }
+
+.scroll-fade {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.scroll-fade.is-scrolling,
+.scroll-fade:hover {
+  scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
+}
+.scroll-fade::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-fade::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-fade::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+.scroll-fade.is-scrolling::-webkit-scrollbar-thumb,
+.scroll-fade:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.6);
+}
