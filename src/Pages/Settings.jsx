@@ -36,10 +36,39 @@ const navItems = [
   { id: "system", icon: Monitor, label: "System Prefs" },
   { id: "language", icon: Globe, label: "Language & Region" },
   { divider: true },
-  { id: "hospital", icon: Building2, label: "Hospital Settings" },
-  { id: "integrations", icon: LinkIcon, label: "Integrations" },
+  // Hospital-wide config, not personal settings — admin only. The section
+  // body itself already said as much ("Only administrators can modify
+  // hospital-wide settings"), the nav just didn't enforce it.
+  {
+    id: "hospital",
+    icon: Building2,
+    label: "Hospital Settings",
+    roles: ["admin"],
+  },
+  {
+    id: "integrations",
+    icon: LinkIcon,
+    label: "Integrations",
+    roles: ["admin"],
+  },
   { id: "support", icon: LifeBuoy, label: "Support" },
 ];
+
+// Filters navItems by role, then strips any divider left orphaned (at the
+// start/end of the list, or directly beside another divider) once
+// role-restricted items on either side of it have been filtered out.
+function getVisibleNavItems(role) {
+  const filtered = navItems.filter(
+    (item) => item.divider || !item.roles || item.roles.includes(role),
+  );
+
+  return filtered.filter((item, i) => {
+    if (!item.divider) return true;
+    const isEdge = i === 0 || i === filtered.length - 1;
+    const nextIsDivider = filtered[i + 1]?.divider;
+    return !isEdge && !nextIsDivider;
+  });
+}
 
 export default function Settings() {
   const showToast = useToast();
@@ -194,6 +223,17 @@ export default function Settings() {
   };
 
   const displayRole = ROLE_LABELS[role] || role || "";
+  const visibleNavItems = getVisibleNavItems(role);
+
+  // Defense in depth: even though the nav button for an admin-only section
+  // is already hidden for other roles, guard the section body too so
+  // activeSection can never render restricted content by any other path.
+  useEffect(() => {
+    const stillVisible = visibleNavItems.some(
+      (item) => !item.divider && item.id === activeSection,
+    );
+    if (!stillVisible) setActiveSection("profile");
+  }, [role]);
 
   return (
     <div>
@@ -202,10 +242,10 @@ export default function Settings() {
         style={{ marginBottom: 18 }}
       >
         <div>
-          <h1 className="text-xl font-display font-bold text-slate-800">
+          <h1 className="text-xl font-display font-bold text-slate-800 dark:text-slate-100">
             Settings
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Manage your account, security, and system preferences
           </p>
         </div>
@@ -222,17 +262,20 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
         <Card className="p-3" style={{ height: "fit-content" }}>
-          {navItems.map((item, i) =>
+          {visibleNavItems.map((item, i) =>
             item.divider ? (
-              <div key={i} className="h-px bg-slate-200 my-2" />
+              <div
+                key={i}
+                className="h-px bg-slate-200 dark:bg-slate-700 my-2"
+              />
             ) : (
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
                 className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm cursor-pointer w-full text-left ${
                   activeSection === item.id
-                    ? "bg-blue-50 text-blue-600 font-medium"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
                 }`}
               >
                 <item.icon size={18} />
@@ -245,7 +288,7 @@ export default function Settings() {
         <div className="flex flex-col gap-4">
           {activeSection === "profile" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Profile Information
               </h3>
               <div className="flex flex-col sm:flex-row items-start gap-6 mb-6">
@@ -261,10 +304,10 @@ export default function Settings() {
                     <img
                       src={photoUrl}
                       alt="Profile"
-                      className="w-20 h-20 rounded-full object-cover border-[3px] border-slate-200"
+                      className="w-20 h-20 rounded-full object-cover border-[3px] border-slate-200 dark:border-slate-600"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-blue-100 text-blue-700 border-[3px] border-slate-200 flex items-center justify-center text-xl font-semibold">
+                    <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-[3px] border-slate-200 dark:border-slate-600 flex items-center justify-center text-xl font-semibold">
                       {(profile.firstName[0] || "").toUpperCase()}
                       {(profile.lastName[0] || "").toUpperCase()}
                     </div>
@@ -279,16 +322,16 @@ export default function Settings() {
                   </button>
                 </div>
                 <div className="flex-1">
-                  <div className="font-display text-lg font-bold text-slate-800">
+                  <div className="font-display text-lg font-bold text-slate-800 dark:text-slate-100">
                     {role === "doctor"
                       ? `Dr. ${profile.firstName} ${profile.lastName}`
                       : `${profile.firstName} ${profile.lastName}`}
                   </div>
-                  <div className="text-[13.5px] text-slate-500 mt-0.5">
+                  <div className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {displayRole}
                     {profile.department ? ` · ${profile.department}` : ""}
                   </div>
-                  <div className="text-[13px] text-blue-600 mt-0.5">
+                  <div className="text-[13px] text-blue-600 dark:text-blue-400 mt-0.5">
                     {profile.email}
                   </div>
                   <div className="flex gap-2 mt-3">
@@ -318,62 +361,62 @@ export default function Settings() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     First Name
                   </label>
                   <input
                     value={profile.firstName}
                     disabled
                     readOnly
-                    className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+                    className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Last Name
                   </label>
                   <input
                     value={profile.lastName}
                     disabled
                     readOnly
-                    className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+                    className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Email Address
                   </label>
                   <div className="relative">
                     <Mail
                       size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
                     />
                     <input
                       value={profile.email}
                       disabled
                       readOnly
-                      className="w-full bg-slate-100 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+                      className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Phone Number
                   </label>
                   <div className="relative">
                     <Phone
                       size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
                     />
                     <input
                       value={profile.phone}
                       onChange={(e) => updateProfile("phone", e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                      className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Department
                   </label>
                   <select
@@ -381,7 +424,7 @@ export default function Settings() {
                     onChange={(e) =>
                       updateProfile("department", e.target.value)
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   >
                     <option>Cardiology</option>
                     <option>Neurology</option>
@@ -392,18 +435,18 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     MDCN Number
                   </label>
                   <input
                     value={profile.mdcn}
                     disabled
                     readOnly
-                    className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 font-mono cursor-not-allowed"
+                    className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed"
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-400 mt-3">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
                 Name, email, and MDCN number are set by an administrator.
                 Contact IT support to update them — only phone and department
                 are self-editable.
@@ -413,23 +456,26 @@ export default function Settings() {
 
           {activeSection === "security" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Security & Authentication
               </h3>
               <div className="flex flex-col gap-4">
                 <div
-                  className="flex items-start justify-between bg-slate-50 border border-slate-200 rounded-[10px]"
+                  className="flex items-start justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
                   style={{ padding: 16 }}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                      <Smartphone size={18} className="text-emerald-600" />
+                    <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                      <Smartphone
+                        size={18}
+                        className="text-emerald-600 dark:text-emerald-400"
+                      />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Two-Factor Authentication
                       </div>
-                      <div className="text-[13px] text-slate-500 mt-0.5">
+                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                         Add an extra layer of security to your account
                       </div>
                       {twoFactor && (
@@ -446,18 +492,21 @@ export default function Settings() {
                 </div>
 
                 <div
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-[10px]"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
                   style={{ padding: 16 }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <Clock size={18} className="text-blue-600" />
+                    <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <Clock
+                        size={18}
+                        className="text-blue-600 dark:text-blue-400"
+                      />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Auto Session Timeout
                       </div>
-                      <div className="text-[13px] text-slate-500 mt-0.5">
+                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                         Automatically sign out after inactivity
                       </div>
                     </div>
@@ -465,7 +514,7 @@ export default function Settings() {
                   <select
                     value={sessionTimeout}
                     onChange={(e) => setSessionTimeout(e.target.value)}
-                    className="text-[13px] bg-white border border-slate-200 rounded-lg px-3 py-1.5"
+                    className="text-[13px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5"
                     style={{ width: 140 }}
                   >
                     <option>15 minutes</option>
@@ -475,18 +524,21 @@ export default function Settings() {
                 </div>
 
                 <div
-                  className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[10px]"
+                  className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
                   style={{ padding: 16 }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                      <Bell size={18} className="text-amber-600" />
+                    <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                      <Bell
+                        size={18}
+                        className="text-amber-600 dark:text-amber-400"
+                      />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         Login Notifications
                       </div>
-                      <div className="text-[13px] text-slate-500 mt-0.5">
+                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                         SMS alert on new sign-ins from unrecognised devices
                       </div>
                     </div>
@@ -501,20 +553,23 @@ export default function Settings() {
                     any real session-tracking route. Flagged for a future pass —
                     intentionally left as-is rather than rebuilt in this change. */}
                 <div
-                  className="bg-slate-50 border border-slate-200 rounded-[10px]"
+                  className="bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
                   style={{ padding: 16 }}
                 >
-                  <div className="text-sm font-semibold text-slate-800 mb-3">
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">
                     Active Sessions
                   </div>
                   <div className="flex items-center justify-between mb-2.5 flex-wrap gap-2">
                     <div className="flex items-center gap-2.5">
-                      <Monitor size={18} className="text-blue-600" />
+                      <Monitor
+                        size={18}
+                        className="text-blue-600 dark:text-blue-400"
+                      />
                       <div>
-                        <div className="text-[13.5px] font-medium text-slate-800">
+                        <div className="text-[13.5px] font-medium text-slate-800 dark:text-slate-100">
                           This device
                         </div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-slate-400 dark:text-slate-500">
                           Current session
                         </div>
                       </div>
@@ -528,7 +583,7 @@ export default function Settings() {
 
           {activeSection === "password" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Change Password
               </h3>
               <form
@@ -536,7 +591,7 @@ export default function Settings() {
                 className="flex flex-col gap-3.5 max-w-sm"
               >
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Current Password
                   </label>
                   <input
@@ -545,11 +600,11 @@ export default function Settings() {
                     onChange={(e) =>
                       setPasswords((p) => ({ ...p, current: e.target.value }))
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     New Password
                   </label>
                   <input
@@ -558,11 +613,11 @@ export default function Settings() {
                     onChange={(e) =>
                       setPasswords((p) => ({ ...p, next: e.target.value }))
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Confirm New Password
                   </label>
                   <input
@@ -571,7 +626,7 @@ export default function Settings() {
                     onChange={(e) =>
                       setPasswords((p) => ({ ...p, confirm: e.target.value }))
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <button
@@ -586,18 +641,18 @@ export default function Settings() {
 
           {activeSection === "2fa" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Two-Factor Authentication
               </h3>
               <div
-                className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[10px] mb-4"
+                className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px] mb-4"
                 style={{ padding: 16 }}
               >
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                     Authenticator App
                   </div>
-                  <div className="text-[13px] text-slate-500 mt-0.5">
+                  <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {twoFactor
                       ? "Currently enabled and protecting your account"
                       : "Currently disabled"}
@@ -617,13 +672,13 @@ export default function Settings() {
               </div>
               {twoFactor && (
                 <div
-                  className="bg-blue-50 border border-blue-100 rounded-lg text-sm text-slate-600"
+                  className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-lg text-sm text-slate-600 dark:text-slate-300"
                   style={{ padding: 14 }}
                 >
                   Scan the QR code in your authenticator app (Google
                   Authenticator, Authy) to link this account, or enter setup
                   key:{" "}
-                  <span className="font-mono text-slate-800">
+                  <span className="font-mono text-slate-800 dark:text-slate-100">
                     MVLT-7F2A-93KD
                   </span>
                 </div>
@@ -633,7 +688,7 @@ export default function Settings() {
 
           {activeSection === "notifications" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Notification Preferences
               </h3>
               <div className="flex flex-col gap-3">
@@ -653,14 +708,14 @@ export default function Settings() {
                 ].map(([key, label, desc]) => (
                   <div
                     key={key}
-                    className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[10px]"
+                    className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
                     style={{ padding: 16 }}
                   >
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         {label}
                       </div>
-                      <div className="text-[13px] text-slate-500 mt-0.5">
+                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                         {desc}
                       </div>
                     </div>
@@ -678,7 +733,7 @@ export default function Settings() {
 
           {activeSection === "system" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 System Preferences
               </h3>
               <div className="flex flex-col gap-4 max-w-sm">
@@ -689,7 +744,7 @@ export default function Settings() {
                   <select
                     value={theme}
                     onChange={(e) => setTheme(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 dark:text-slate-100"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 dark:text-slate-100"
                   >
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
@@ -697,7 +752,7 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Table Density
                   </label>
                   <select
@@ -705,7 +760,7 @@ export default function Settings() {
                     onChange={(e) =>
                       setSystemPrefs((p) => ({ ...p, density: e.target.value }))
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   >
                     <option>Comfortable</option>
                     <option>Compact</option>
@@ -717,12 +772,12 @@ export default function Settings() {
 
           {activeSection === "language" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Language & Region
               </h3>
               <div className="flex flex-col gap-4 max-w-sm">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Language
                   </label>
                   <select
@@ -730,7 +785,7 @@ export default function Settings() {
                     onChange={(e) =>
                       setLangPrefs((p) => ({ ...p, language: e.target.value }))
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   >
                     <option>English (UK)</option>
                     <option>English (US)</option>
@@ -740,7 +795,7 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Timezone
                   </label>
                   <select
@@ -748,7 +803,7 @@ export default function Settings() {
                     onChange={(e) =>
                       setLangPrefs((p) => ({ ...p, timezone: e.target.value }))
                     }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   >
                     <option>WAT (UTC+1)</option>
                     <option>GMT (UTC+0)</option>
@@ -760,30 +815,30 @@ export default function Settings() {
 
           {activeSection === "hospital" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Hospital Settings
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-w-2xl">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Hospital Name
                   </label>
                   <input
                     defaultValue={hospital}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     State
                   </label>
                   <input
                     defaultValue="Anambra"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-400 mt-3">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
                 Only administrators can modify hospital-wide settings.
               </p>
             </Card>
@@ -791,7 +846,7 @@ export default function Settings() {
 
           {activeSection === "integrations" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Integrations
               </h3>
               <div className="flex flex-col gap-3">
@@ -814,14 +869,14 @@ export default function Settings() {
                 ].map(([key, label, desc]) => (
                   <div
                     key={key}
-                    className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-[10px]"
+                    className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
                     style={{ padding: 16 }}
                   >
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                         {label}
                       </div>
-                      <div className="text-[13px] text-slate-500 mt-0.5">
+                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                         {desc}
                       </div>
                     </div>
@@ -839,7 +894,7 @@ export default function Settings() {
 
           {activeSection === "support" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 mb-5">
+              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
                 Contact Support
               </h3>
               <form
@@ -851,7 +906,7 @@ export default function Settings() {
                   value={supportMsg}
                   onChange={(e) => setSupportMsg(e.target.value)}
                   placeholder="Describe the issue you're experiencing..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 resize-none"
+                  className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 resize-none"
                 />
                 <button
                   type="submit"
