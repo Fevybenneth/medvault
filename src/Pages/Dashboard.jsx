@@ -63,9 +63,9 @@ const ROLE_INTRO = {
 const ACTIONS = {
   [ROLES.ADMIN]: [
     {
-      label: "New patient",
+      label: "Link portal",
       icon: Users,
-      to: "/patients/new",
+      to: "/patients/link-portal",
       primary: true,
     },
     {
@@ -539,7 +539,6 @@ export default function Dashboard() {
   const auditBreakdownTotal = successful + failedAudit + blocked + errorEvents;
 
   const storageUsedBytes = record.storage?.used_bytes || 0;
-
 
   const title = user?.first_name
     ? `Good to see you, ${user.first_name}.`

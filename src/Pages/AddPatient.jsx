@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Calendar, Phone, MapPin, Fingerprint, Stethoscope, Mail, Lock } from 'lucide-react'
+import { User, Calendar, Phone, MapPin, Fingerprint, Stethoscope } from 'lucide-react'
 import { Card } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { api } from '../lib/api'
@@ -21,8 +21,6 @@ export default function AddPatient() {
     address: '',
     nationalId: '',
     assignedDoctorId: '',
-    portalEmail: '',
-    portalPassword: '',
   })
 
   const update = (field, value) => setForm((f) => ({ ...f, [field]: value }))
@@ -30,12 +28,6 @@ export default function AddPatient() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Backend rule: portal_email and portal_password must be provided together,
-    // or not at all — one without the other silently skips account creation.
-    if ((form.portalEmail && !form.portalPassword) || (!form.portalEmail && form.portalPassword)) {
-      showToast('Provide both a portal email and password, or leave both blank', 'info')
-      return
-    }
 
     // Shape matches POST /records/patients request body
     const payload = {
@@ -47,14 +39,11 @@ export default function AddPatient() {
       address: form.address || undefined,
       national_id: form.nationalId || undefined,
       assigned_doctor_id: form.assignedDoctorId ? Number(form.assignedDoctorId) : undefined,
-      ...(form.portalEmail && form.portalPassword
-        ? { portal_email: form.portalEmail, portal_password: form.portalPassword }
-        : {}),
     }
 
     setSubmitting(true)
     try {
-      await api.createPatient(payload)
+      await api.registerPatient(payload)
       // No more local caching needed — GET /patients is a real route now,
       // so the Patients page will just fetch this patient properly.
       showToast(`${form.firstName || 'New patient'} ${form.lastName || ''} registered successfully`.trim())
@@ -190,7 +179,7 @@ export default function AddPatient() {
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-4 mt-1">
+          {/* <div className="border-t border-slate-200 pt-4 mt-1">
             <p className="text-xs font-semibold text-slate-700 mb-3">Portal Access (optional)</p>
             <div className="grid grid-cols-2 gap-3.5">
               <div>
@@ -221,7 +210,7 @@ export default function AddPatient() {
               </div>
             </div>
             <p className="text-xs text-slate-400 mt-2">Both fields required together, or leave both blank to add portal access later.</p>
-          </div>
+          </div> */}
 
           <div className="flex gap-2 mt-2">
             <button type="submit" disabled={submitting} className="flex-1 bg-blue-600 text-white font-semibold text-sm py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60">

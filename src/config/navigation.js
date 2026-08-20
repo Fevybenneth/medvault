@@ -2,6 +2,8 @@ import {
     LayoutDashboard,
     Users,
     UserRoundSearch,
+    UserPlus,
+    Link2,
     FileText,
     Upload,
     ClipboardList,
@@ -37,6 +39,7 @@ export const PERMISSIONS = {
     VIEW_LOGS: "view_logs",
     EDIT_OWN_RECORDS: "edit_own_records",
     LINK_PATIENT_IDENTITY: "link_patient_identity",
+    REGISTER_PATIENT: "register_patient",
 };
 
 const item = (label, path, icon, group, permission = null) => ({
@@ -50,9 +53,10 @@ const item = (label, path, icon, group, permission = null) => ({
 export const NAVIGATION = {
     [ROLES.ADMIN]: [
         item("Dashboard", "/dashboard", LayoutDashboard, "Overview"),
-        item("Patients", "/patients", Users, "Clinical Data"),
-        item("Medical Records", "/records", FileText, "Clinical Data", PERMISSIONS.VIEW_RECORDS),
-        item("User Management", "/users", Users, "Administration", PERMISSIONS.MANAGE_USERS),
+        item("Patients", "/patients", Users, "Patient Management"),
+        item("Link Portal Account", "/patients/link-portal", Link2, "Patient Management", PERMISSIONS.LINK_PATIENT_IDENTITY),
+        item("Medical Records", "/records", FileText, "Administration", PERMISSIONS.VIEW_RECORDS),
+        item("Staff", "/users", Users, "Administration", PERMISSIONS.MANAGE_USERS),
         item("Audit Logs", "/audit", ShieldCheck, "Administration", PERMISSIONS.VIEW_LOGS),
         item("Settings", "/settings", Settings, "Account"),
     ],
@@ -67,6 +71,7 @@ export const NAVIGATION = {
 
     [ROLES.NURSE]: [
         item("Dashboard", "/dashboard", LayoutDashboard, "Overview"),
+        item("Register Patient", "/patients/new", UserPlus, "Patient Management", PERMISSIONS.REGISTER_PATIENT),
         item("My Patients", "/patients", UserRoundSearch, "Patient Care"),
         item("Medical Records", "/records", FileText, "Patient Care", PERMISSIONS.VIEW_RECORDS),
         item("Upload Record", "/upload", Upload, "Patient Care", PERMISSIONS.UPLOAD_RECORDS),
@@ -83,7 +88,9 @@ export const NAVIGATION = {
 
     [ROLES.RECORDS_OFFICER]: [
         item("Dashboard", "/dashboard", LayoutDashboard, "Overview"),
-        item("Patients", "/patients", Users, "Records"),
+        item("Register Patient", "/patients/new", UserPlus, "Patient Management", PERMISSIONS.REGISTER_PATIENT),
+        item("Patient Directory", "/patients", Users, "Patient Management"),
+        item("Link Portal", "/patients/link-portal", Link2, "Patient Management", PERMISSIONS.LINK_PATIENT_IDENTITY),
         item("Medical Records", "/records", FileText, "Records", PERMISSIONS.VIEW_RECORDS),
         item("Settings", "/settings", Settings, "Account"),
     ],

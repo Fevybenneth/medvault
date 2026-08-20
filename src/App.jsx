@@ -9,6 +9,7 @@ import Login from "./Pages/Login";
 import Dashboard from "./Pages/Dashboard";
 import Patients from "./Pages/Patients";
 import AddPatient from "./Pages/AddPatient";
+import LinkPortal from "./Pages/LinkPortal";
 import PatientProfile from "./Pages/PatientProfile";
 import Records from "./Pages/Records";
 import Upload from "./Pages/Upload";
@@ -51,7 +52,10 @@ function AppLayout({ children }) {
         <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
           <TopNav onMenuClick={() => setSidebarOpen(true)} />
 
-          <main ref={mainScrollRef} className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto">
+          <main
+            ref={mainScrollRef}
+            className="flex-1 min-w-0 p-3 sm:p-6 overflow-y-auto"
+          >
             {children}
           </main>
         </div>
@@ -117,9 +121,25 @@ function App() {
       <Route
         path="/patients/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute
+            permission="register_patient"
+            message="Registering new patients is restricted for your role."
+          >
             <AppLayout>
               <AddPatient />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patients/link-portal"
+        element={
+          <ProtectedRoute
+            permission="link_patient_identity"
+            message="Linking portal accounts is restricted for your role."
+          >
+            <AppLayout>
+              <LinkPortal />
             </AppLayout>
           </ProtectedRoute>
         }

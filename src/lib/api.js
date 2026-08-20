@@ -149,7 +149,7 @@ export const api = {
       method: "GET",
     }),
 
-  createPatient: async (payload) =>
+  registerPatient: async (payload) =>
     request("/patients/", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -161,8 +161,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  createPatientPortalAccount: async (patientId, payload) =>
-    request(`/patients/${patientId}/portal-account`, {
+  grantPortalAccess: async (patientId, payload) =>
+    request(`/patients/${patientId}/portal-access`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
