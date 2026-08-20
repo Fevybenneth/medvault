@@ -1,32 +1,36 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Download,
   UserPlus,
   Link2,
-  Edit2,
-  FileText,
   ChevronLeft,
   ChevronRight,
   Loader2,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { Card } from "../components/ui";
-import { useToast } from "../components/Toast";
+import { Card, Badge } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { GrantModal } from "./LinkPortal";
 
-// Real GET /patients route confirmed in the updated backend contract
-// (dts302_api_contract v3) — this now fetches genuinely real data. The
-// real Patient model has no blood_group, department, or status field,
-// so this page no longer shows those (they were mock/UI-only concepts).
+// Real GET /patients route, includes has_portal_account / portal_email /
+// assigned_doctor_name (added to PatientListItemSchema). Row actions are
+// permission-gated per role (see ROLE_PERMISSIONS): View is available to
+// anyone who can see this page at all (view_patients already gates the
+// route); Grant Portal Access only shows for link_patient_identity roles
+// (admin, records_officer) and only on unlinked patients. Edit intentionally
+// has no row-level button here — it lives on PatientProfile, gated there by
+// edit_patients, so a lab technician (view_patients but not edit_patients)
+// never sees an edit affordance for a patient at all.
 
 function downloadCSV(rows) {
-  const header = "Hospital ID,Name,Age,Gender,Phone,Assigned Doctor\n";
+  const header =
+    "Hospital ID,Name,Age,Gender,Phone,Assigned Doctor,Portal Access\n";
   const body = rows
     .map(
       (p) =>
-        `${p.hospital_id},${p.first_name} ${p.last_name},${p.age},${p.gender || ""},${p.phone || ""},${p.assigned_doctor_id || ""}`,
+        `${p.hospital_id},${p.first_name} ${p.last_name},${p.age},${p.gender || ""},${p.phone || ""},${p.assigned_doctor_name || ""},${p.has_portal_account ? "Linked" : "Not linked"}`,
     )
     .join("\n");
   const blob = new Blob([header + body], { type: "text/csv" });
@@ -40,7 +44,6 @@ function downloadCSV(rows) {
 
 export default function Patients() {
   const navigate = useNavigate();
-  const showToast = useToast();
   const { hasPermission } = useAuth();
   const [search, setSearch] = useState("");
 
@@ -48,12 +51,26 @@ export default function Patients() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const loadPatients = (searchTerm = "") => {
+  const [grantTarget, setGrantTarget] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const loadPatients = (searchTerm = "", pageNum = 1) => {
     setLoading(true);
     setLoadError("");
     api
-      .getPatients({ search: searchTerm || undefined })
-      .then((data) => setPatientsList(data?.patients || []))
+      .getPatients({
+        search: searchTerm || undefined,
+        page: pageNum,
+        limit: 20,
+      })
+      .then((data) => {
+        setPatientsList(data?.patients || []);
+        setTotal(data?.total || 0);
+        setTotalPages(data?.pages || 1);
+        setPage(data?.page || 1);
+      })
       .catch((err) => {
         if (err instanceof TypeError) {
           setLoadError(
@@ -70,19 +87,19 @@ export default function Patients() {
     loadPatients();
   }, []);
 
-  // Search is server-side per the contract (fuzzy match on first_name,
-  // last_name, national_id) — debounce so we're not firing a request per keystroke.
   useEffect(() => {
-    const t = setTimeout(() => loadPatients(search), 400);
+    const t = setTimeout(() => loadPatients(search, 1), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  const canGrantPortal = hasPermission("link_patient_identity");
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-xl font-display font-bold text-slate-800">
+          <h1 className="text-xl font-display font-bold text-slate-800 dark:text-slate-100">
             Patient Management
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -97,13 +114,13 @@ export default function Patients() {
             <Download size={14} />
             Export CSV
           </button>
-          {hasPermission("link_patient_identity") && (
+          {canGrantPortal && (
             <button
               onClick={() => navigate("/patients/link-portal")}
               className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 flex items-center gap-1.5 hover:bg-slate-50"
             >
               <Link2 size={14} />
-              Link Portal
+              Portal Access
             </button>
           )}
           {hasPermission("register_patient") && (
@@ -127,7 +144,7 @@ export default function Patients() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or national ID..."
+            placeholder="Search by name, hospital ID, phone, or national ID..."
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-500"
           />
         </div>
@@ -137,23 +154,22 @@ export default function Patients() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-2.5 w-10">
-                  <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5 accent-blue-600"
-                  />
-                </th>
-                {["Hospital ID", "Patient Name", "Age", "Phone", "Actions"].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+              <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                {[
+                  "Hospital ID",
+                  "Patient Name",
+                  "Age",
+                  "Phone",
+                  "Portal Access",
+                  "Actions",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5 whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -196,29 +212,16 @@ export default function Patients() {
                 patientsList.map((p) => (
                   <tr
                     key={p.id}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700/40"
                   >
                     <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 accent-blue-600"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[12.5px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                      <span className="text-[12.5px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-300 px-2 py-0.5 rounded">
                         {p.hospital_id}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <img
-                          src={`https://i.pravatar.cc/64?u=${p.id}`}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                        />
-                        <div className="text-sm font-medium text-slate-800">
-                          {p.first_name} {p.last_name}
-                        </div>
+                      <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                        {p.first_name} {p.last_name}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
@@ -228,29 +231,29 @@ export default function Patients() {
                       {p.phone || "—"}
                     </td>
                     <td className="px-4 py-3">
+                      <Badge
+                        tone={p.has_portal_account ? "active" : "discharged"}
+                      >
+                        {p.has_portal_account ? "Linked" : "Not linked"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex gap-1.5">
-                        <Link to={`/patients/${p.id}`}>
-                          <button className="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100">
-                            View
+                        <button
+                          onClick={() => navigate(`/patients/${p.id}`)}
+                          className="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        >
+                          View
+                        </button>
+                        {canGrantPortal && !p.has_portal_account && (
+                          <button
+                            onClick={() => setGrantTarget(p)}
+                            className="text-xs px-2.5 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50 flex items-center gap-1"
+                          >
+                            <Link2 size={11} />
+                            Grant
                           </button>
-                        </Link>
-                        <button
-                          onClick={() =>
-                            showToast(
-                              "Use the View page to edit this patient",
-                              "info",
-                            )
-                          }
-                          className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button
-                          onClick={() => navigate("/records")}
-                          className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
-                        >
-                          <FileText size={12} />
-                        </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -260,25 +263,45 @@ export default function Patients() {
         </div>
 
         <div
-          className="flex items-center justify-between border-t border-slate-100"
+          className="flex items-center justify-between border-t border-slate-100 dark:border-slate-700"
           style={{ padding: "14px 18px" }}
         >
           <div className="text-[13px] text-slate-500">
-            Showing 1–{patientsList.length} of {patientsList.length} patients
+            Showing {patientsList.length === 0 ? 0 : (page - 1) * 20 + 1}–
+            {(page - 1) * 20 + patientsList.length} of {total} patients
           </div>
           <div className="flex gap-1.5 items-center">
-            <button className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500">
+            <button
+              disabled={page <= 1}
+              onClick={() => loadPatients(search, page - 1)}
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <ChevronLeft size={14} />
             </button>
             <button className="min-w-[30px] h-7 rounded-md bg-blue-600 text-white text-xs">
-              1
+              {page}
             </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500">
+            <button
+              disabled={page >= totalPages}
+              onClick={() => loadPatients(search, page + 1)}
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <ChevronRight size={14} />
             </button>
           </div>
         </div>
       </Card>
+
+      {grantTarget && (
+        <GrantModal
+          patient={grantTarget}
+          onClose={() => setGrantTarget(null)}
+          onGranted={() => {
+            setGrantTarget(null);
+            loadPatients(search);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import AddPatient from "./Pages/AddPatient";
 import LinkPortal from "./Pages/LinkPortal";
 import PatientProfile from "./Pages/PatientProfile";
 import Records from "./Pages/Records";
+import RecordDetail from "./Pages/RecordDetail";
 import Upload from "./Pages/Upload";
 import Users from "./Pages/Users";
 import Audit from "./Pages/Audit";
@@ -163,6 +164,19 @@ function App() {
           >
             <AppLayout>
               <Records />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/records/:id"
+        element={
+          <ProtectedRoute
+            permission="view_record_detail"
+            message="Viewing decrypted record content is restricted for your role."
+          >
+            <AppLayout>
+              <RecordDetail />
             </AppLayout>
           </ProtectedRoute>
         }

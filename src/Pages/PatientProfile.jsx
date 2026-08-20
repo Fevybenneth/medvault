@@ -1,457 +1,312 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-  ChevronRight,
-  Edit2,
   ArrowLeft,
+  Pencil,
   Loader2,
+  Mail,
+  CheckCircle2,
+  Circle,
+  FlaskConical,
+  ScanLine,
+  HeartPulse,
   FileText,
-  ShieldCheck,
-  ShieldOff,
-  Eye,
+  ChevronRight,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { Badge, Button, Card } from "../components/ui";
+import { Card, Badge, Button } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
+import { GrantModal } from "./LinkPortal";
 
-export default function PatientProfile() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const showToast = useToast();
+// Patient Profile — metadata-only hub for one patient. Built entirely from
+// GET /patients/<id> (demographics, portal status) and GET /records (list,
+// metadata only — no decrypted content). This is deliberately the same
+// permission tier as the main Patients directory (view_patients / view_records),
+// so a role like admin — which has view_records but not view_record_detail —
+// can fully see this page. Opening a record's actual decrypted content is a
+// separate, deeper action (RecordDetail.jsx) gated by view_record_detail.
 
-  const [patient, setPatient] = useState(null);
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [recordsLoading, setRecordsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+const recordTypeIcons = {
+  "Lab Report": FlaskConical,
+  Imaging: ScanLine,
+  Prescription: HeartPulse,
+  "Discharge Summary": FileText,
+  Vitals: HeartPulse,
+  "Clinical Notes": FileText,
+};
 
-  useEffect(() => {
-    let cancelled = false;
+const statusTone = {
+  admitted: "admitted",
+  discharged: "discharged",
+  outpatient: "stable",
+};
 
-    setLoading(true);
-    setLoadError("");
-
-    api
-      .getPatient(id)
-      .then((data) => {
-        if (!cancelled) setPatient(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-
-        if (err instanceof TypeError) {
-          setLoadError(
-            "Could not reach the server — it may be waking up, try again shortly",
-          );
-        } else if (err.message?.toLowerCase().includes("not found")) {
-          setLoadError("not_found");
-        } else {
-          setLoadError(err.message || "Could not load this patient");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setRecordsLoading(true);
-
-    api
-      .getRecords({ patient_id: id })
-      .then((data) => {
-        if (cancelled) return;
-
-        const items = Array.isArray(data)
-          ? data
-          : data?.records || data?.items || [];
-
-        setRecords(items);
-      })
-      .catch(() => {
-        if (!cancelled) setRecords([]);
-      })
-      .finally(() => {
-        if (!cancelled) setRecordsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="text-center text-sm text-slate-400 py-20">
-        <Loader2 size={20} className="animate-spin inline-block mr-2" />
-        Loading patient...
-      </div>
-    );
-  }
-
-  if (loadError || !patient) {
-    return (
-      <div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-4">
-          <Link to="/patients" className="text-blue-600">
-            Patients
-          </Link>
-
-          <ChevronRight size={13} />
-
-          <span className="text-slate-700">Not found</span>
-        </div>
-
-        <Card className="p-10 text-center">
-          <div className="text-sm font-semibold text-slate-700">
-            {loadError === "not_found"
-              ? "No patient found with this ID"
-              : loadError || "Could not load this patient"}
-          </div>
-
-          <div className="text-[13px] text-slate-500 mt-1">
-            It may have been removed, or the link is incorrect.
-          </div>
-
-          <Link to="/patients">
-            <Button size="sm" className="mt-4">
-              Back to Patients
-            </Button>
-          </Link>
-        </Card>
-      </div>
-    );
-  }
-
-  const fullName =
-    patient.full_name ||
-    `${patient.first_name || ""} ${patient.last_name || ""}`.trim();
-
-  const initials =
-    fullName
-      .split(" ")
-      .filter(Boolean)
-      .map((name) => name[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "P";
-
-  const isLinked = Boolean(patient.has_portal_account);
-
-  const formatDate = (value) => {
-    if (!value) return "—";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) return "—";
-
-    return date.toLocaleDateString("en-GB", {
+function formatDate(timestamp) {
+  if (!timestamp) return "—";
+  try {
+    return new Date(timestamp).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
-  };
-
-  const getRecordTitle = (record) => {
-    return (
-      record.title ||
-      record.record_type_label ||
-      record.record_type ||
-      "Medical Record"
-    );
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-xs text-slate-400">
-        <Link to="/patients" className="text-blue-600 hover:text-blue-700">
-          Patients
-        </Link>
-
-        <ChevronRight size={13} />
-
-        <span className="text-slate-700">{fullName}</span>
-      </div>
-
-      {/* Patient Header */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-          <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-semibold flex-shrink-0">
-            {initials}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
-                  Patient
-                </p>
-
-                <h1 className="text-2xl font-bold text-slate-800">
-                  {fullName}
-                </h1>
-
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded">
-                    {patient.hospital_id || "—"}
-                  </span>
-
-                  {isLinked ? (
-                    <Badge tone="active">
-                      <ShieldCheck size={13} className="mr-1 inline" />
-                      Linked
-                    </Badge>
-                  ) : (
-                    <Badge tone="warning">
-                      <ShieldOff size={13} className="mr-1 inline" />
-                      Not Linked
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate("/patients")}
-                >
-                  <ArrowLeft size={14} />
-                  Back
-                </Button>
-
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    showToast("Patient edit form — coming soon", "info")
-                  }
-                >
-                  <Edit2 size={14} />
-                  Edit
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Patient Information */}
-      <Card className="p-6">
-        <div className="mb-5">
-          <h2 className="text-base font-semibold text-slate-800">
-            Patient Information
-          </h2>
-
-          <div className="h-px bg-slate-200 mt-3" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-5">
-          <InfoItem
-            label="Age"
-            value={patient.age ? `${patient.age} years` : "—"}
-          />
-
-          <InfoItem label="Gender" value={formatGender(patient.gender)} />
-
-          <InfoItem label="Phone" value={patient.phone} />
-
-          <InfoItem label="National ID" value={patient.national_id} />
-
-          <InfoItem
-            label="Address"
-            value={patient.address}
-            className="lg:col-span-2"
-          />
-
-          <InfoItem
-            label="Doctor"
-            value={
-              patient.assigned_doctor_name ||
-              (patient.assigned_doctor_id
-                ? `Staff #${patient.assigned_doctor_id}`
-                : "Not assigned")
-            }
-          />
-
-          <InfoItem
-            label="Status"
-            value={patient.is_active === false ? "Inactive" : "Active"}
-          />
-        </div>
-      </Card>
-
-      {/* Portal Access */}
-      <Card className="p-6">
-        <div className="mb-5">
-          <h2 className="text-base font-semibold text-slate-800">
-            Portal Access
-          </h2>
-
-          <div className="h-px bg-slate-200 mt-3" />
-        </div>
-
-        {isLinked ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                <ShieldCheck size={17} />
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-800">
-                    Linked
-                  </span>
-
-                  <Badge tone="active">Portal enabled</Badge>
-                </div>
-
-                <p className="text-[13px] text-slate-500 mt-1">
-                  {patient.portal_email ||
-                    patient.email ||
-                    "Portal account linked"}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
-                <ShieldOff size={17} />
-              </div>
-
-              <div>
-                <div className="text-sm font-semibold text-slate-800">
-                  Not linked
-                </div>
-
-                <p className="text-[13px] text-slate-500 mt-1">
-                  This patient does not currently have portal access.
-                </p>
-              </div>
-            </div>
-
-            <Button
-              size="sm"
-              onClick={() =>
-                showToast("Grant Portal Access — coming next", "info")
-              }
-            >
-              Grant Portal Access
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      {/* Records */}
-      <Card className="overflow-hidden">
-        <div className="p-6 pb-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-slate-800">
-                Records
-              </h2>
-
-              <p className="text-[13px] text-slate-500 mt-1">
-                {records.length} medical record
-                {records.length === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-
-          <div className="h-px bg-slate-200 mt-4" />
-        </div>
-
-        {recordsLoading ? (
-          <div className="p-10 text-center text-sm text-slate-400">
-            <Loader2 size={18} className="animate-spin inline-block mr-2" />
-            Loading records...
-          </div>
-        ) : records.length === 0 ? (
-          <div className="p-10 text-center">
-            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-              <FileText size={18} />
-            </div>
-
-            <p className="text-sm font-medium text-slate-700 mt-3">
-              No medical records
-            </p>
-
-            <p className="text-xs text-slate-400 mt-1">
-              There are no records available for this patient.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {records.map((record) => (
-              <div
-                key={record.id}
-                className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-                    <FileText size={17} />
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-800 truncate">
-                      {getRecordTitle(record)}
-                    </div>
-
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      {formatDate(
-                        record.created_at || record.record_date || record.date,
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate(`/records/${record.id}`)}
-                >
-                  <Eye size={14} />
-                  View
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
+  } catch {
+    return timestamp;
+  }
 }
 
-function InfoItem({ label, value, className = "" }) {
+function InfoField({ label, value }) {
   return (
-    <div className={className}>
-      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+    <div>
+      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
         {label}
       </div>
-
-      <div className="text-sm font-medium text-slate-800 break-words">
+      <div className="text-sm text-slate-800 dark:text-slate-100">
         {value || "—"}
       </div>
     </div>
   );
 }
 
-function formatGender(gender) {
-  if (!gender) return "—";
+export default function PatientProfile() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const showToast = useToast();
+  const { hasPermission } = useAuth();
 
-  const value = String(gender).toUpperCase();
+  const [patient, setPatient] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  if (value === "M") return "Male";
-  if (value === "F") return "Female";
+  const [records, setRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
 
-  return gender;
+  const [grantOpen, setGrantOpen] = useState(false);
+
+  const loadPatient = () => {
+    setLoading(true);
+    setLoadError("");
+    api
+      .getPatient(id)
+      .then((data) => setPatient(data))
+      .catch((err) => {
+        if (err instanceof TypeError) {
+          setLoadError(
+            "Could not reach the server — it may be waking up, try refreshing shortly",
+          );
+        } else {
+          setLoadError(err.message || "Could not load this patient");
+        }
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const loadRecords = () => {
+    setRecordsLoading(true);
+    api
+      .getRecords({ patient_id: id })
+      .then((data) => setRecords(data?.records || []))
+      .catch(() => setRecords([]))
+      .finally(() => setRecordsLoading(false));
+  };
+
+  useEffect(() => {
+    loadPatient();
+    loadRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="p-10 flex justify-center text-slate-400">
+        <Loader2 size={22} className="animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError || !patient) {
+    return (
+      <Card className="p-10 text-center text-sm text-slate-500">
+        {loadError || "Patient not found."}
+        <div className="mt-4">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate("/patients")}
+          >
+            <ArrowLeft size={13} />
+            Back to Patients
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  const linked = patient.has_portal_account;
+
+  return (
+    <div>
+      <button
+        onClick={() => navigate("/patients")}
+        className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 mb-4"
+      >
+        <ArrowLeft size={13} />
+        Back to Patients
+      </button>
+
+      <Card className="p-5 mb-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-xl font-display font-bold text-slate-800 dark:text-slate-100">
+              {patient.full_name}
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {patient.hospital_id} · Age {patient.age}
+              {patient.gender ? ` · ${patient.gender}` : ""}
+            </p>
+          </div>
+          {hasPermission("edit_patients") && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => showToast("Edit patient form coming soon", "info")}
+            >
+              <Pencil size={13} />
+              Edit
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card className="p-5 mb-4">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">
+          Patient Information
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-4">
+          <InfoField label="Age" value={patient.age} />
+          <InfoField label="Gender" value={patient.gender} />
+          <InfoField label="Phone" value={patient.phone} />
+          <InfoField label="National ID" value={patient.national_id} />
+          <InfoField label="Address" value={patient.address} />
+          <InfoField label="Doctor" value={patient.assigned_doctor_name} />
+          <InfoField label="Ward" value={patient.ward} />
+          <InfoField
+            label="Status"
+            value={
+              patient.status && (
+                <Badge
+                  tone={
+                    statusTone[patient.status?.toLowerCase()] || "discharged"
+                  }
+                >
+                  {patient.status}
+                </Badge>
+              )
+            }
+          />
+        </div>
+      </Card>
+
+      <Card className="p-5 mb-4">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">
+          Portal Access
+        </h2>
+        {linked ? (
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2
+              size={18}
+              className="text-emerald-600 flex-shrink-0"
+            />
+            <div>
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                Linked
+              </div>
+              {patient.portal_email && (
+                <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                  <Mail size={12} />
+                  {patient.portal_email}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2.5">
+              <Circle size={18} className="text-slate-300 flex-shrink-0" />
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                Not linked
+              </span>
+            </div>
+            {hasPermission("link_patient_identity") && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setGrantOpen(true)}
+              >
+                Grant Portal Access
+              </Button>
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+          Records
+        </h2>
+        <p className="text-xs text-slate-500 mb-4">
+          {recordsLoading
+            ? "Loading…"
+            : `${records.length} medical record${records.length === 1 ? "" : "s"}`}
+        </p>
+
+        {recordsLoading ? (
+          <div className="py-6 flex justify-center text-slate-400">
+            <Loader2 size={18} className="animate-spin" />
+          </div>
+        ) : records.length === 0 ? (
+          <p className="text-sm text-slate-400 py-4 text-center">
+            No records for this patient yet.
+          </p>
+        ) : (
+          <div className="flex flex-col divide-y divide-slate-100 dark:divide-slate-700">
+            {records.map((r) => {
+              const Icon = recordTypeIcons[r.record_type] || FileText;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => navigate(`/records/${r.id}`)}
+                  className="flex items-center gap-3 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/40 -mx-2 px-2 rounded-lg transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-md bg-slate-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
+                    <Icon size={14} className="text-slate-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {r.record_type}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {formatDate(r.created_at)}
+                    </div>
+                  </div>
+                  <span className="text-xs text-blue-600 font-medium flex items-center gap-0.5 flex-shrink-0">
+                    View
+                    <ChevronRight size={13} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {grantOpen && (
+        <GrantModal
+          patient={patient}
+          onClose={() => setGrantOpen(false)}
+          onGranted={loadPatient}
+        />
+      )}
+    </div>
+  );
 }

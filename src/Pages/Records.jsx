@@ -216,47 +216,78 @@ export default function Records() {
               {!loading && !loadError && filtered.map((r) => {
                 const t = typeIcons[r.type] || typeIcons['Clinical Notes']
                 return (
-                  <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <tr
+                    key={r.id}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                  >
                     <td className="px-4 py-3">
-                      <input type="checkbox" className="w-3.5 h-3.5 accent-blue-600" />
+                      <input
+                        type="checkbox"
+                        className="w-3.5 h-3.5 accent-blue-600"
+                      />
                     </td>
-                    <td className="px-4 py-3 text-xs font-mono text-slate-500">{r.id}</td>
+                    <td className="px-4 py-3 text-xs font-mono text-slate-500">
+                      {r.id}
+                    </td>
                     <td className="px-4 py-3">
-                      <div className="text-[13.5px] font-medium text-slate-800">{r.patient}</div>
+                      <div className="text-[13.5px] font-medium text-slate-800">
+                        {r.patient}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <div className={`w-6 h-6 rounded-md flex items-center justify-center ${t.bg}`}>
+                        <div
+                          className={`w-6 h-6 rounded-md flex items-center justify-center ${t.bg}`}
+                        >
                           <t.icon size={13} className={t.color} />
                         </div>
-                        <span className="text-[13.5px] text-slate-700 whitespace-nowrap">{r.type}</span>
+                        <span className="text-[13.5px] text-slate-700 whitespace-nowrap">
+                          {r.type}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{r.doctor}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{r.dept}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{r.date}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{r.size}</td>
+                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                      {r.doctor}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                      {r.dept}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                      {r.date}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                      {r.size}
+                    </td>
                     <td className="px-4 py-3">
                       <EncBadge />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1.5">
                         <button
-                          disabled={!r.patientId}
-                          title={r.patientId ? 'View patient' : 'Patient link not available from this list yet'}
-                          onClick={() => r.patientId && navigate(`/patients/${r.patientId}`)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="View record"
+                          onClick={() => navigate(`/records/${r.id}`)}
+                          className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
                         >
                           <Eye size={12} />
                         </button>
                         <button
-                          onClick={() => showToast(`Downloading ${r.id}... file will decrypt after authentication`, 'info')}
+                          onClick={() =>
+                            showToast(
+                              `Downloading ${r.id}... file will decrypt after authentication`,
+                              "info",
+                            )
+                          }
                           className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
                         >
                           <Download size={12} />
                         </button>
                         <button
-                          onClick={() => showToast(`Share link for ${r.id} — logged in audit trail`, 'info')}
+                          onClick={() =>
+                            showToast(
+                              `Share link for ${r.id} — logged in audit trail`,
+                              "info",
+                            )
+                          }
                           className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
                         >
                           <Share2 size={12} />
@@ -264,7 +295,7 @@ export default function Records() {
                       </div>
                     </td>
                   </tr>
-                )
+                );
               })}
             </tbody>
           </table>

@@ -20,13 +20,21 @@ export function Badge({ tone = 'discharged', children }) {
   )
 }
 
-export function EncBadge() {
+export function EncBadge({ size = "md" }) {
+  if (size === "sm") {
+    return (
+      <span className="inline-flex items-center gap-0.5 bg-emerald-600 text-white px-1.5 py-[1px] rounded-full text-[9.5px] font-semibold">
+        <Lock size={9} />
+        AES-256
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1 bg-emerald-600 text-white px-2.5 py-0.5 rounded-full text-[11px] font-semibold">
       <Lock size={11} />
       AES-256
     </span>
-  )
+  );
 }
 
 export function Button({ variant = 'secondary', size = 'md', className = '', children, ...props }) {

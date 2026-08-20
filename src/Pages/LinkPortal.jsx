@@ -15,7 +15,7 @@ import { useToast } from "../components/Toast";
 // (patient_created vs patient_portal_linked).
 // Visible to admin + records_officer only, matching link_patient_identity.
 
-function GrantModal({ patient, onClose, onGranted }) {
+export function GrantModal({ patient, onClose, onGranted }) {
   const showToast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [email, setEmail] = useState("");
