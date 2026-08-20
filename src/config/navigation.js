@@ -54,7 +54,7 @@ export const NAVIGATION = {
     [ROLES.ADMIN]: [
         item("Dashboard", "/dashboard", LayoutDashboard, "Overview"),
         item("Patients", "/patients", Users, "Patient Management"),
-        item("Link Portal Account", "/patients/link-portal", Link2, "Patient Management", PERMISSIONS.LINK_PATIENT_IDENTITY),
+        item("Grant Portal Access", "/patients/link-portal", Link2, "Patient Management", PERMISSIONS.LINK_PATIENT_IDENTITY),
         item("Medical Records", "/records", FileText, "Administration", PERMISSIONS.VIEW_RECORDS),
         item("Staff", "/users", Users, "Administration", PERMISSIONS.MANAGE_USERS),
         item("Audit Logs", "/audit", ShieldCheck, "Administration", PERMISSIONS.VIEW_LOGS),
@@ -90,7 +90,7 @@ export const NAVIGATION = {
         item("Dashboard", "/dashboard", LayoutDashboard, "Overview"),
         item("Register Patient", "/patients/new", UserPlus, "Patient Management", PERMISSIONS.REGISTER_PATIENT),
         item("Patient Directory", "/patients", Users, "Patient Management"),
-        item("Link Portal", "/patients/link-portal", Link2, "Patient Management", PERMISSIONS.LINK_PATIENT_IDENTITY),
+        item("Portal Access", "/patients/link-portal", Link2, "Patient Management", PERMISSIONS.LINK_PATIENT_IDENTITY),
         item("Medical Records", "/records", FileText, "Records", PERMISSIONS.VIEW_RECORDS),
         item("Settings", "/settings", Settings, "Account"),
     ],

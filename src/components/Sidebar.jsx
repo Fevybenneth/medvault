@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { LogOut, X, PanelLeftClose, PanelLeftOpen, Pin } from "lucide-react";
 
 import { hospital } from "../lib/mockData";
@@ -20,6 +20,20 @@ export default function Sidebar({
   const navItems = getNavigationForRole(role).filter((item) =>
     hasPermission(item.permission),
   );
+
+  const location = useLocation();
+
+  const isItemActive = (item) => {
+    const path = location.pathname;
+    if (path === item.path) return true;
+    if (!path.startsWith(item.path + "/")) return false;
+    return !navItems.some(
+      (other) =>
+        other.path !== item.path &&
+        other.path.length > item.path.length &&
+        (path === other.path || path.startsWith(other.path + "/")),
+    );
+  };
 
   const displayName = user?.first_name
     ? role === "doctor"
@@ -226,25 +240,25 @@ export default function Sidebar({
                   to={item.path}
                   onClick={onClose}
                   title={!pinned ? item.label : undefined}
-                  className={({ isActive }) =>
+                  className={() =>
                     `
-            group
-            relative
-            flex
-            items-center
-            h-10
-            text-[13.5px]
-            border-l-[2.5px]
-            transition-colors
+    group
+    relative
+    flex
+    items-center
+    h-10
+    text-[13.5px]
+    border-l-[2.5px]
+    transition-colors
 
-            ${pinned ? "gap-2.5 px-5" : "justify-center px-0"}
+    ${pinned ? "gap-2.5 px-5" : "justify-center px-0"}
 
-            ${
-              isActive
-                ? "text-blue-400 bg-blue-600/10 border-blue-600"
-                : "text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5"
-            }
-            `
+    ${
+      isItemActive(item)
+        ? "text-blue-400 bg-blue-600/10 border-blue-600"
+        : "text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5"
+    }
+    `
                   }
                 >
                   <item.icon size={17} className="shrink-0" />
