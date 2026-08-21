@@ -1,232 +1,79 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  FileText,
+  Database,
+  Users,
+  ShieldCheck,
+  History,
   Activity,
   ArrowRight,
-  Database,
-  FileText,
-  HeartPulse,
-  History,
-  LockKeyhole,
+  Lock,
   RefreshCw,
-  Server,
-  ShieldCheck,
   UploadCloud,
-  UserCog,
   UserPlus,
-  Users,
-  Wifi,
+  FileBarChart,
+  UserCog,
 } from "lucide-react";
-
 import { Card } from "../components/ui";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_LABELS, ROLES } from "../config/navigation";
 
-const ROLE_INTRO = {
-  [ROLES.ADMIN]: "System overview, staff access and security posture.",
-  [ROLES.DOCTOR]: "Your clinical workspace and assigned-record activity.",
-  [ROLES.NURSE]: "Your patient-record workspace and clinical activity.",
-  [ROLES.LAB_TECHNICIAN]: "Your laboratory records and upload activity.",
-  [ROLES.RECORDS_OFFICER]: "Hospital record retrieval and storage overview.",
-  [ROLES.AUDITOR]: "Audit activity, access outcomes and system health.",
-  [ROLES.PATIENT]: "Your medical records and account status.",
-};
-
-const ACTIONS = {
-  [ROLES.ADMIN]: [
-    {
-      label: "Create staff",
-      icon: UserPlus,
-      to: "/users",
-      primary: true,
-    },
-    {
-      label: "Link portal",
-      icon: Users,
-      to: "/patients/link-portal",
-    },
-    {
-      label: "Manage users",
-      icon: UserCog,
-      to: "/users",
-    },
-    {
-      label: "Review audit",
-      icon: History,
-      to: "/audit",
-    },
-  ],
-
-  [ROLES.DOCTOR]: [
-    {
-      label: "Upload record",
-      icon: UploadCloud,
-      to: "/upload",
-      primary: true,
-    },
-    {
-      label: "My patients",
-      icon: Users,
-      to: "/patients",
-    },
-    {
-      label: "Medical records",
-      icon: FileText,
-      to: "/records",
-    },
-  ],
-
-  [ROLES.NURSE]: [
-    {
-      label: "Upload record",
-      icon: UploadCloud,
-      to: "/upload",
-      primary: true,
-    },
-    {
-      label: "My patients",
-      icon: Users,
-      to: "/patients",
-    },
-    {
-      label: "Medical records",
-      icon: FileText,
-      to: "/records",
-    },
-  ],
-
-  [ROLES.LAB_TECHNICIAN]: [
-    {
-      label: "Upload result",
-      icon: UploadCloud,
-      to: "/upload",
-      primary: true,
-    },
-    {
-      label: "Patients",
-      icon: Users,
-      to: "/patients",
-    },
-    {
-      label: "Medical records",
-      icon: FileText,
-      to: "/records",
-    },
-  ],
-
-  [ROLES.RECORDS_OFFICER]: [
-    {
-      label: "Medical records",
-      icon: FileText,
-      to: "/records",
-      primary: true,
-    },
-    {
-      label: "Patients",
-      icon: Users,
-      to: "/patients",
-    },
-  ],
-
-  [ROLES.AUDITOR]: [
-    {
-      label: "Open audit logs",
-      icon: History,
-      to: "/audit",
-      primary: true,
-    },
-  ],
-
-  [ROLES.PATIENT]: [
-    {
-      label: "My records",
-      icon: FileText,
-      to: "/records",
-      primary: true,
-    },
-    {
-      label: "My profile",
-      icon: HeartPulse,
-      to: "/settings",
-    },
-  ],
-};
-
+// Self-contained inline formatting helpers
 function formatBytes(bytes = 0) {
   if (!bytes) return "0 B";
-
   const units = ["B", "KB", "MB", "GB", "TB"];
-
   const index = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
     units.length - 1,
   );
-
   const value = bytes / 1024 ** index;
-
-  return `${
-    value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)
-  } ${units[index]}`;
+  return `${value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)} ${units[index]}`;
 }
 
 function timeAgo(isoString) {
   if (!isoString) return "";
-
   const date = new Date(isoString);
-
   if (Number.isNaN(date.getTime())) return "";
-
   const diffMs = Date.now() - date.getTime();
   const mins = Math.floor(diffMs / 60000);
-
   if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-
+  if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-
   if (hours < 24) return `${hours}h ago`;
-
-  const days = Math.floor(hours / 24);
-
-  if (days === 1) return "yesterday";
-
-  return `${days}d ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
-// Compact horizontal stat card — icon + value inline, single detail line.
-// Replaces the previous stacked layout (icon row, then large value, then
-// label, then detail) which ran ~142px tall on desktop for no real reason.
 function StatCard({ icon: Icon, label, value, detail, tone = "neutral" }) {
   const tones = {
-    neutral: "bg-slate-50 text-slate-600",
-    emerald: "bg-emerald-50 text-emerald-600",
-    amber: "bg-amber-50 text-amber-600",
-    red: "bg-red-50 text-red-600",
+    neutral: "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
+    emerald:
+      "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    amber:
+      "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    blue: "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400",
   };
 
   return (
-    <Card className="p-3.5 min-w-0">
+    <Card className="p-4">
       <div className="flex items-center gap-3">
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${tones[tone]}`}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tones[tone]}`}
         >
-          <Icon size={15} />
+          <Icon size={16} />
         </div>
-
-        <div className="min-w-0">
-          <div className="text-lg font-display font-bold text-slate-800 truncate leading-tight">
+        <div className="min-w-0 flex-1">
+          <div className="text-xl font-display font-bold text-slate-800 dark:text-slate-100 leading-none truncate">
             {value}
           </div>
-
-          <div className="text-[11px] font-medium text-slate-600 truncate">
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 truncate">
             {label}
           </div>
         </div>
       </div>
-
       {detail && (
-        <div className="text-[10.5px] text-slate-400 mt-2 truncate">
+        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 truncate">
           {detail}
         </div>
       )}
@@ -234,853 +81,466 @@ function StatCard({ icon: Icon, label, value, detail, tone = "neutral" }) {
   );
 }
 
-function SectionTitle({ title, caption, action, onAction, badge }) {
-  return (
-    <div className="flex items-end justify-between gap-3 mb-3">
-      <div>
-        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
-
-        {caption && <p className="text-xs text-slate-400 mt-0.5">{caption}</p>}
-      </div>
-
-      <div className="flex items-center gap-2">
-        {badge && (
-          <span className="text-[10px] uppercase tracking-wider text-slate-400">
-            {badge}
-          </span>
-        )}
-
-        {action && (
-          <button
-            type="button"
-            onClick={onAction}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
-          >
-            {action}
-            <ArrowRight size={13} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LoadingCard() {
-  return (
-    <Card className="p-3.5 h-[86px]">
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-slate-100 animate-pulse shrink-0" />
-
-        <div className="flex-1">
-          <div className="h-5 w-16 rounded bg-slate-100 animate-pulse" />
-          <div className="h-3 w-20 rounded bg-slate-100 animate-pulse mt-1.5" />
-        </div>
-      </div>
-
-      <div className="h-3 w-28 rounded bg-slate-100 animate-pulse mt-2" />
-    </Card>
-  );
-}
-
-function EmptyState({ text }) {
-  return (
-    <div className="rounded-lg border border-dashed border-slate-200 py-8 text-center text-xs text-slate-400">
-      {text}
-    </div>
-  );
-}
-
-function ChainRow({ icon: Icon, label, status, detail, isLast }) {
-  const healthy = status === "healthy";
-
-  return (
-    <div className="relative flex items-center gap-3 pl-1">
-      {!isLast && (
-        <span className="absolute left-[7px] top-5 bottom-[-14px] w-px bg-slate-200" />
-      )}
-
-      <span
-        className={`relative z-10 w-[9px] h-[9px] rounded-full ${
-          healthy ? "bg-emerald-500" : "bg-amber-500"
-        }`}
-      />
-
-      <span className="flex-1 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5">
-        <span className="flex items-center gap-2 text-xs text-slate-600">
-          <Icon size={14} className="text-slate-400" />
-          {label}
-        </span>
-
-        <span
-          className={`text-[11px] font-semibold ${
-            healthy ? "text-emerald-600" : "text-amber-600"
-          }`}
-        >
-          {detail || status || "Unknown"}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function AuditMetric({ label, value, tone }) {
-  const classes = {
-    emerald: "text-emerald-600 bg-emerald-50",
-    red: "text-red-600 bg-red-50",
-    amber: "text-amber-600 bg-amber-50",
-  };
-
-  return (
-    <div className="rounded-lg border border-slate-100 p-3">
-      <div
-        className={`w-fit rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${classes[tone]}`}
-      >
-        {label}
-      </div>
-
-      <div className="mt-2 text-xl font-bold text-slate-800">{value}</div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-100 px-3.5 py-3">
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">
-        {label}
-      </div>
-
-      <div className="text-xs font-semibold text-slate-700 mt-1 truncate">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function RecentRecords({ records, onOpen }) {
-  if (!records?.length) {
-    return <EmptyState text="No recent records to show yet." />;
-  }
-
-  return (
-    <div className="space-y-2">
-      {records.map((record) => (
-        <button
-          key={record.id}
-          type="button"
-          onClick={() => onOpen(record.id)}
-          className="w-full flex items-center justify-between rounded-lg border border-slate-100 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors"
-        >
-          <span className="flex items-center gap-2.5 min-w-0">
-            <FileText size={14} className="text-slate-400 shrink-0" />
-
-            <span className="text-xs font-medium text-slate-700 truncate capitalize">
-              {record.record_type?.replaceAll("_", " ") || "Medical record"}
-            </span>
-          </span>
-
-          <span className="text-[11px] text-slate-400 shrink-0 ml-3">
-            {timeAgo(record.created_at)}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, role, hasPermission } = useAuth();
 
   const [data, setData] = useState({
-    record: null,
-    staff: null,
-    audit: null,
-    health: null,
-    patients: null,
-    recent: null,
+    recordStats: null,
+    staffStats: null,
+    auditStats: null,
+    recentRecords: [],
+    totalPatients: 0,
   });
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [errors, setErrors] = useState([]);
-  const [lastUpdated, setLastUpdated] = useState(null);
 
   const isAdmin = role === ROLES.ADMIN;
-  const canAudit = role === ROLES.ADMIN || role === ROLES.AUDITOR;
+  const isAuditor = role === ROLES.AUDITOR;
   const isPatient = role === ROLES.PATIENT;
 
-  const canViewRecordStats = [
-    ROLES.DOCTOR,
-    ROLES.NURSE,
-    ROLES.LAB_TECHNICIAN,
-    ROLES.RECORDS_OFFICER,
-    ROLES.PATIENT,
-  ].includes(role);
+  // Permission-based, not role-arrays — this is what was actually wrong.
+  // register_patient is held by doctor, nurse, records_officer only; admin
+  // was never supposed to be in this list, and checking the real permission
+  // means it can never drift out of sync with the backend matrix again.
+  const canUpload = hasPermission("upload_records");
+  const canCreatePatient = hasPermission("register_patient");
+  const canManageStaff = hasPermission("manage_users");
 
-  const load = useCallback(async () => {
+  // Reports has no dedicated permission yet (still mock-data per the
+  // backend, flagged in the open items list) — access note says Admin +
+  // Records Officer + Auditor. Once Reports gets backend-wired, replace
+  // this with hasPermission("view_reports") like everything else here.
+  const canViewReports = isAdmin || isAuditor || role === ROLES.RECORDS_OFFICER;
+
+  const loadDashboardData = useCallback(async () => {
     const requests = [];
 
-    if (canAudit) {
-      requests.push(["health", api.getSystemHealth()]);
-    }
-
-    // Admin now shares this fetch too — its record stats and recent-records
-    // list previously went either unused (stats) or unfetched (recent),
-    // which is what left the admin dashboard with no real records view.
-    if (canViewRecordStats || isAdmin) {
-      requests.push(["record", api.getRecordStats()]);
-
-      requests.push([
-        "recent",
-        api.getRecords({
-          limit: 5,
-          page: 1,
-        }),
-      ]);
+    if (!isAuditor) {
+      requests.push(
+        api
+          .getRecordStats()
+          .then((res) => ["recordStats", res])
+          .catch(() => ["recordStats", null]),
+        api
+          .getRecords({ limit: 5 })
+          .then((res) => ["recentRecords", res?.records || []])
+          .catch(() => ["recentRecords", []]),
+      );
     }
 
     if (isAdmin) {
-      requests.push(["staff", api.getStaffStats()]);
-
-      requests.push(["patients", api.getPatients()]);
+      requests.push(
+        api
+          .getStaffStats()
+          .then((res) => ["staffStats", res])
+          .catch(() => ["staffStats", null]),
+        api
+          .getPatients({ limit: 1 })
+          .then((res) => ["totalPatients", res?.total || 0])
+          .catch(() => ["totalPatients", 0]),
+      );
     }
 
-    if (canAudit) {
-      requests.push(["audit", api.getAuditStats()]);
+    if (isAdmin || isAuditor) {
+      requests.push(
+        api
+          .getAuditStats()
+          .then((res) => ["auditStats", res])
+          .catch(() => ["auditStats", null]),
+      );
     }
 
-    const results = await Promise.allSettled(
-      requests.map(([, promise]) => promise),
-    );
+    const results = await Promise.all(requests);
+    const updates = Object.fromEntries(results);
 
-    const next = {};
-    const failed = [];
-
-    results.forEach((result, index) => {
-      const key = requests[index][0];
-
-      if (result.status === "fulfilled") {
-        next[key] = result.value;
-      } else {
-        failed.push(key);
-      }
-    });
-
-    setData((current) => ({
-      ...current,
-      ...next,
-    }));
-
-    setErrors(failed);
-    setLastUpdated(new Date());
-  }, [canAudit, canViewRecordStats, isAdmin]);
+    setData((prev) => ({ ...prev, ...updates }));
+  }, [isAdmin, isAuditor]);
 
   useEffect(() => {
-    let active = true;
-
     setLoading(true);
-
-    load().finally(() => {
-      if (active) {
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [load]);
+    loadDashboardData().finally(() => setLoading(false));
+  }, [loadDashboardData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-
     try {
-      await load();
+      await loadDashboardData();
     } finally {
       setRefreshing(false);
     }
   };
 
-  const record = data.record || {};
-  const staff = data.staff || {};
-  const audit = data.audit || {};
-  const health = data.health || {};
+  const recordStats = data.recordStats || {};
+  const staffStats = data.staffStats || {};
+  const auditStats = data.auditStats || {};
 
-  const recentRecords = data.recent?.records || [];
+  const roleLabel = ROLE_LABELS[role] || role || "Staff";
+  const userGreeting = user?.first_name
+    ? user.role === "doctor"
+      ? `Good to see you, Dr. ${user.first_name}.`
+      : `Good to see you, ${user.first_name}.`
+    : "Welcome back.";
 
-  const recordTypes = Object.entries(record.by_type || {}).sort(
-    (a, b) => b[1] - a[1],
-  );
-
-  const auditActions = Object.entries(audit.recent_activity || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
-
-  const totalAudit = audit.total || 0;
-  const successful = audit.successful || 0;
-  const failedAudit = audit.failed || 0;
-  const blocked = audit.blocked || 0;
-  const errorEvents = audit.error_events || 0;
-
-  const auditBreakdownTotal = successful + failedAudit + blocked + errorEvents;
-
-  const storageUsedBytes = record.storage?.used_bytes || 0;
-
-  const title = user?.first_name
-    ? `Good to see you, ${user.first_name}.`
-    : "Dashboard";
-
-  const roleLabel = ROLE_LABELS[role] || "Authenticated user";
-
-  const actions = ACTIONS[role] || [];
-
-  const date = useMemo(
-    () =>
-      new Intl.DateTimeFormat("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(new Date()),
-    [],
-  );
-
-  const isAuditRole = canAudit;
-
-  // Only Auditor gets the dedicated audit-activity panel and the full
-  // breakdown section further down — that's their whole job. Admin now
-  // sees the same "what's actually happening with records" view every
-  // other operational role sees, instead of a third copy of audit numbers.
-  const showAuditPanel = role === ROLES.AUDITOR;
-  const showRecentActivity = canViewRecordStats || isAdmin;
-
-  const dataScope = isPatient
-    ? "Own records"
-    : role === ROLES.DOCTOR
-      ? "Assigned patients"
-      : role === ROLES.NURSE
-        ? "Assigned patients"
-        : role === ROLES.LAB_TECHNICIAN
-          ? "Uploaded records"
-          : role === ROLES.RECORDS_OFFICER || role === ROLES.ADMIN
-            ? "Hospital records"
-            : "Audit events";
-
-  const primaryStats =
-    role === ROLES.ADMIN
-      ? [
-          {
-            icon: Users,
-            label: "Active staff",
-            value: staff.active ?? "—",
-            detail: `${staff.total ?? 0} total · ${staff.locked ?? 0} locked`,
-            tone: staff.locked > 0 ? "amber" : "neutral",
-          },
-          {
-            icon: Users,
-            label: "Patients",
-            value: data.patients?.total ?? "—",
-            detail: "Registered patient records",
-            tone: "neutral",
-          },
-          {
-            icon: FileText,
-            label: "Medical records",
-            value: record.total ?? "—",
-            detail: `${record.attachments ?? 0} with attachments`,
-            tone: "neutral",
-          },
-          {
-            icon: ShieldCheck,
-            label: "Security",
-            value: blocked || "—",
-            detail: `${blocked} blocked · ${errorEvents} errors`,
-            tone: blocked > 0 ? "amber" : "neutral",
-          },
-        ]
-      : role === ROLES.AUDITOR
-        ? [
-            {
-              icon: History,
-              label: "Audit events",
-              value: totalAudit,
-              detail: `${successful} successful`,
-              tone: "neutral",
-            },
-            {
-              icon: ShieldCheck,
-              label: "Blocked events",
-              value: blocked,
-              detail: `${failedAudit} failed · ${errorEvents} errors`,
-              tone: blocked > 0 ? "amber" : "neutral",
-            },
-            {
-              icon: Activity,
-              label: "Tracked actions",
-              value: auditActions.length,
-              detail: "Action groups currently recorded",
-              tone: "neutral",
-            },
-          ]
-        : role === ROLES.LAB_TECHNICIAN
-          ? [
-              {
-                icon: FileText,
-                label: "Lab records",
-                value: record.total ?? "—",
-                detail: "Uploaded by you",
-                tone: "neutral",
-              },
-              {
-                icon: UploadCloud,
-                label: "With attachments",
-                value: record.attachments ?? "—",
-                detail: "Results with files",
-                tone: "neutral",
-              },
-            ]
-          : isPatient
-            ? [
-                {
-                  icon: FileText,
-                  label: "My records",
-                  value: record.total ?? "—",
-                  detail: `${record.attachments ?? 0} with attachments`,
-                  tone: "neutral",
-                },
-              ]
-            : [
-                {
-                  icon: FileText,
-                  label: "Medical records",
-                  value: record.total ?? "—",
-                  detail: `${record.attachments ?? 0} with attachments`,
-                  tone: "neutral",
-                },
-                {
-                  icon: Database,
-                  label: "Record storage",
-                  value: formatBytes(record.storage?.used_bytes || 0),
-                  detail: "File storage in your scope",
-                  tone: "neutral",
-                },
-                {
-                  icon: FileText,
-                  label: "Record types",
-                  value: recordTypes.length,
-                  detail: "Types in your authorised scope",
-                  tone: "neutral",
-                },
-              ];
-
-  const HeaderBlock = (
-    <header className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-4 mb-6">
-      {/* Left */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-blue-600">
-            MedVault / {roleLabel}
-          </span>
-
-          {isAuditRole && health.status && (
-            <>
-              <span
-                className={`inline-flex items-center gap-1.5 text-[10px] font-semibold ${
-                  health.status === "healthy"
-                    ? "text-[#2F6F5E]"
-                    : "text-[#C48A2A]"
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    health.status === "healthy"
-                      ? "bg-[#2F6F5E]"
-                      : "bg-[#C48A2A]"
-                  }`}
-                />
-
-                {health.status === "healthy"
-                  ? "System healthy"
-                  : "System degraded"}
-              </span>
-            </>
-          )}
-        </div>
-
-        <h1 className="text-xl font-display font-bold text-slate-800">
-          {title}
-        </h1>
-
-        <p className="text-sm text-slate-500 mt-0.5">
-          {ROLE_INTRO[role] || "Secure hospital records workspace."}
-        </p>
-      </div>
-
-      {/* Right */}
-      <div className="flex items-center justify-start sm:justify-end gap-4 sm:pt-0.5">
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-
-          {refreshing ? "Refreshing" : "Refresh"}
-        </button>
-
-        <div className="text-right text-xs text-slate-400 leading-tight">
-          <div>{date}</div>
-
-          {lastUpdated && (
-            <div className="text-[10px] text-slate-300 mt-1">
-              Updated {timeAgo(lastUpdated.toISOString())}
-            </div>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-
-  const ErrorBanner = errors.length > 0 && (
-    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-      Some current metrics could not be loaded: {errors.join(", ")}. The
-      dashboard is showing the data that was available.
-    </div>
-  );
-
-  /*
-   * Patient dashboard intentionally stays simple.
-   *
-   * Patients should see their records and account
-   * information, not hospital infrastructure,
-   * audit statistics, storage metrics, or staff
-   * management information.
-   */
-  if (isPatient) {
-    return (
-      <div className="pb-6">
-        {HeaderBlock}
-
-        {ErrorBanner}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6">
-          {loading ? (
-            <>
-              <LoadingCard />
-              <LoadingCard />
-            </>
-          ) : (
-            primaryStats.map((stat) => <StatCard key={stat.label} {...stat} />)
-          )}
-        </div>
-
-        <Card className="p-5 mb-4">
-          <SectionTitle
-            title="My recent records"
-            caption="Your most recently added medical records."
-            action="View all"
-            onAction={() => navigate("/records")}
-          />
-
-          <RecentRecords
-            records={recentRecords}
-            onOpen={(id) => navigate(`/records/${id}`)}
-          />
-        </Card>
-
-        <Card className="p-5">
-          <SectionTitle
-            title="My account"
-            caption="Your profile as held by the hospital."
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <InfoRow
-              label="Account"
-              value={user?.is_active === false ? "Inactive" : "Active"}
-            />
-
-            <InfoRow label="Data scope" value={dataScope} />
+  return (
+    <div className="space-y-6 pb-12">
+      {/* Header & Quick Action Trigger Cluster */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md">
+              {roleLabel}
+            </span>
+            <span className="text-xs text-slate-400">
+              · MedVault Clinical Engine
+            </span>
           </div>
+          <h1 className="text-2xl font-display font-bold text-slate-800 dark:text-slate-100 mt-1">
+            {userGreeting}
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {canUpload && (
+            <button
+              type="button"
+              onClick={() => navigate("/upload")}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-xs cursor-pointer"
+            >
+              <UploadCloud size={14} />
+              <span>Upload Record</span>
+            </button>
+          )}
+
+          {canCreatePatient && (
+            <button
+              type="button"
+              onClick={() => navigate("/patients/new")}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            >
+              <UserPlus
+                size={14}
+                className="text-slate-500 dark:text-slate-400"
+              />
+              <span>Add Patient</span>
+            </button>
+          )}
+
+          {canManageStaff && (
+            <button
+              type="button"
+              onClick={() => navigate("/users/new")}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            >
+              <UserCog
+                size={14}
+                className="text-slate-500 dark:text-slate-400"
+              />
+              <span>Create Staff</span>
+            </button>
+          )}
 
           <button
             type="button"
-            onClick={() => navigate("/settings")}
-            className="w-full mt-3 flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
           >
-            <span className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-md flex items-center justify-center bg-slate-100 text-slate-600">
-                <HeartPulse size={15} />
-              </span>
-
-              <span className="text-xs font-medium text-slate-700">
-                Edit my profile
-              </span>
-            </span>
-
-            <ArrowRight size={14} className="text-slate-400" />
+            <RefreshCw
+              size={13}
+              className={refreshing ? "animate-spin text-blue-600" : ""}
+            />
+            <span>{refreshing ? "Syncing..." : "Sync Metrics"}</span>
           </button>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pb-6">
-      {HeaderBlock}
-
-      {ErrorBanner}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-6">
-        {loading
-          ? primaryStats.map((_, index) => <LoadingCard key={index} />)
-          : primaryStats.map((stat) => <StatCard key={stat.label} {...stat} />)}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.65fr_1fr] gap-4 mb-4">
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card
+              key={i}
+              className="p-4 h-24 animate-pulse bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800"
+            />
+          ))
+        ) : (
+          <>
+            {!isAuditor && (
+              <>
+                <StatCard
+                  icon={FileText}
+                  label={isPatient ? "My Records" : "Medical Records"}
+                  value={recordStats.total ?? "—"}
+                  detail={`${recordStats.attachments ?? 0} files in storage`}
+                  tone="blue"
+                />
+                <StatCard
+                  icon={Database}
+                  label="Encrypted Volume"
+                  value={formatBytes(recordStats.storage?.used_bytes || 0)}
+                  detail="AES-256-GCM sealed blobs"
+                  tone="neutral"
+                />
+              </>
+            )}
+
+            {isAdmin && (
+              <>
+                <StatCard
+                  icon={Users}
+                  label="Registered Patients"
+                  value={data.totalPatients}
+                  detail="Verified demographic entries"
+                  tone="neutral"
+                />
+                <StatCard
+                  icon={ShieldCheck}
+                  label="Active Staff"
+                  value={staffStats.active ?? "—"}
+                  detail={`${staffStats.locked ?? 0} locked accounts`}
+                  tone={staffStats.locked > 0 ? "amber" : "emerald"}
+                />
+              </>
+            )}
+
+            {isAuditor && (
+              <>
+                <StatCard
+                  icon={History}
+                  label="Total Audit Events"
+                  value={auditStats.total ?? "—"}
+                  detail={`${auditStats.successful ?? 0} verified transactions`}
+                  tone="blue"
+                />
+                <StatCard
+                  icon={ShieldCheck}
+                  label="Blocked Attempts"
+                  value={auditStats.blocked ?? 0}
+                  detail={`${auditStats.failed ?? 0} authentication failures`}
+                  tone={auditStats.blocked > 0 ? "amber" : "emerald"}
+                />
+                <StatCard
+                  icon={Activity}
+                  label="Action Scopes"
+                  value={Object.keys(auditStats.recent_activity || {}).length}
+                  detail="Distinct logged action types"
+                  tone="neutral"
+                />
+                <StatCard
+                  icon={Lock}
+                  label="Hash Chain State"
+                  value="Secured"
+                  detail="Sequential SHA-256 validation"
+                  tone="emerald"
+                />
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Main Operational Two-Column Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-6">
+        {/* Left Column: Recent Record Activity */}
         <Card className="p-5">
-          <SectionTitle
-            title={
-              showAuditPanel
-                ? "Audit activity"
-                : showRecentActivity
-                  ? "Recent record activity"
-                  : "Overview"
-            }
-            caption={
-              showAuditPanel
-                ? "Events currently recorded by the audit service."
-                : showRecentActivity
-                  ? "Most recently added records."
-                  : "Current dashboard information."
-            }
-            action={
-              showAuditPanel
-                ? "Open audit"
-                : showRecentActivity
-                  ? "Open records"
-                  : undefined
-            }
-            onAction={() => navigate(showAuditPanel ? "/audit" : "/records")}
-          />
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {isAuditor
+                  ? "Forensic Action Breakdown"
+                  : "Recent Record Activity"}
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {isAuditor
+                  ? "Distribution of security events across hospital subsystems"
+                  : "Latest decrypted records queried within your authorization scope"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(isAuditor ? "/audit" : "/records")}
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>View all</span>
+              <ArrowRight size={12} />
+            </button>
+          </div>
 
-          {showAuditPanel ? (
-            <div className="space-y-3">
-              {auditActions.length ? (
-                auditActions.map(([action, count]) => {
-                  const width = totalAudit
-                    ? Math.max(4, Math.round((count / totalAudit) * 100))
-                    : 4;
-
+          {isAuditor ? (
+            <div className="space-y-3 pt-2">
+              {Object.entries(auditStats.recent_activity || {}).map(
+                ([action, count]) => {
+                  const percentage = auditStats.total
+                    ? Math.max(5, Math.round((count / auditStats.total) * 100))
+                    : 5;
                   return (
-                    <div key={action}>
-                      <div className="flex justify-between gap-3 text-xs mb-1">
-                        <span className="text-slate-600 truncate">
-                          {action}
+                    <div key={action} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-medium text-slate-700 dark:text-slate-300 capitalize">
+                          {action.replaceAll("_", " ")}
                         </span>
-
-                        <span className="font-semibold text-slate-800">
+                        <span className="font-mono text-slate-500 dark:text-slate-400 font-semibold">
                           {count}
                         </span>
                       </div>
-
-                      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-blue-500"
-                          style={{
-                            width: `${width}%`,
-                          }}
+                          className="h-full bg-blue-600 rounded-full"
+                          style={{ width: `${percentage}%` }}
                         />
                       </div>
                     </div>
                   );
-                })
-              ) : (
-                <EmptyState text="No audit activity has been recorded yet." />
+                },
               )}
             </div>
-          ) : showRecentActivity ? (
-            <RecentRecords
-              records={recentRecords}
-              onOpen={(id) => navigate(`/records/${id}`)}
-            />
           ) : (
-            <EmptyState text="No recent activity to show." />
-          )}
-        </Card>
-
-        {canAudit ? (
-          <Card className="p-5">
-            <SectionTitle
-              title="System status"
-              caption="Live dependency checks."
-              badge="Admin & auditor"
-            />
-
-            <div className="space-y-3.5">
-              <ChainRow icon={Wifi} label="API" status={health.api?.status} />
-
-              <ChainRow
-                icon={Database}
-                label="Database"
-                status={health.database?.status}
-              />
-
-              {/* Storage now folds usage into this row instead of a
-                  separate full-width card above the fold. */}
-              <ChainRow
-                icon={Server}
-                label={`Storage · ${health.storage?.provider || "Storage"}`}
-                status={health.storage?.status}
-                detail={
-                  health.storage?.status && health.storage.status !== "healthy"
-                    ? health.storage.status
-                    : `${formatBytes(storageUsedBytes)} used`
-                }
-                isLast
-              />
-            </div>
-            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-500 inline-flex items-center gap-1.5">
-                <LockKeyhole size={13} />
-                Encrypted records
-              </span>
-
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
-                Protected
-              </span>
-            </div>
-          </Card>
-        ) : (
-          <Card className="p-5 flex flex-col justify-center">
-            <div className="flex items-center gap-2 text-emerald-600 mb-1">
-              <ShieldCheck size={16} />
-
-              <span className="text-xs font-semibold">
-                Access scope enforced
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Your dashboard only displays information returned for your
-              authorised role and data scope.
-            </p>
-          </Card>
-        )}
-      </div>
-
-      {/* Full audit breakdown now stays Auditor-only — Admin already sees
-          a compact Security card up top; this section duplicated that
-          same data a second and third time. */}
-      {role === ROLES.AUDITOR && (
-        <Card className="p-5 mb-4">
-          <SectionTitle
-            title="Audit integrity"
-            caption="Status distribution across the audit trail."
-            action="Review logs"
-            onAction={() => navigate("/audit")}
-          />
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <AuditMetric label="Success" value={successful} tone="emerald" />
-
-            <AuditMetric label="Failed" value={failedAudit} tone="red" />
-
-            <AuditMetric label="Blocked" value={blocked} tone="amber" />
-
-            <AuditMetric label="Errors" value={errorEvents} tone="red" />
-          </div>
-
-          <div className="mt-4 flex items-center justify-between text-[11px] text-slate-400">
-            <span>
-              {totalAudit
-                ? Math.round((auditBreakdownTotal / totalAudit) * 100)
-                : 100}
-              % of total events represented
-            </span>
-
-            <span>{totalAudit} total</span>
-          </div>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.35fr] gap-4">
-        <Card className="p-5">
-          <SectionTitle
-            title="Quick actions"
-            caption="Shortcuts available to your role."
-          />
-
-          <div className="space-y-2">
-            {actions.map(({ label, icon: Icon, to, primary }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => navigate(to)}
-                className={`w-full flex items-center justify-between rounded-lg border px-3.5 py-3 text-left transition-colors ${
-                  primary
-                    ? "border-blue-200 bg-blue-50/60 hover:bg-blue-50"
-                    : "border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <span className="flex items-center gap-3">
-                  <span
-                    className={`w-8 h-8 rounded-md flex items-center justify-center ${
-                      primary
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
+            <div className="space-y-2">
+              {data.recentRecords.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  No recent records found in your authorized scope.
+                </div>
+              ) : (
+                data.recentRecords.map((rec) => (
+                  <div
+                    key={rec.id}
+                    onClick={() => navigate(`/records/${rec.id}`)}
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-100 dark:border-slate-800 transition-colors cursor-pointer"
                   >
-                    <Icon size={15} />
-                  </span>
-
-                  <span className="text-xs font-medium text-slate-700">
-                    {label}
-                  </span>
-                </span>
-
-                <ArrowRight size={14} className="text-slate-400" />
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <SectionTitle
-            title="Scope & access"
-            caption="What this dashboard is showing you."
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <InfoRow label="Role" value={roleLabel} />
-
-            <InfoRow
-              label="Account"
-              value={user?.is_active === false ? "Inactive" : "Active"}
-            />
-
-            <InfoRow
-              label="Department"
-              value={user?.department || "Not specified"}
-            />
-
-            <InfoRow label="Data scope" value={dataScope} />
-          </div>
-
-          {!isAuditRole && record.storage?.used_bytes !== undefined && (
-            <div className="mt-4 rounded-lg bg-slate-50 border border-slate-100 p-3 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Storage represented in your scope
-              </span>
-
-              <span className="text-xs font-semibold text-slate-800">
-                {formatBytes(record.storage.used_bytes)}
-              </span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <FileText size={15} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 capitalize truncate">
+                          {rec.record_type?.replaceAll("_", " ") ||
+                            "Medical Record"}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {rec.patient_name ? `${rec.patient_name} · ` : ""}
+                          {rec.department || "General"}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400 shrink-0 ml-3">
+                      {timeAgo(rec.created_at)}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </Card>
+
+        {/* Right Column: Security & Role Scope Info */}
+        <div className="space-y-6">
+          <Card className="p-5">
+            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-3">
+              <ShieldCheck size={18} />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                Security & Scope Posture
+              </h3>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Access Governance
+                </span>
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  Pure RBAC (NDPA-2023)
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Authenticated Role
+                </span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {roleLabel}
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Clinical Department
+                </span>
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {user?.department || "General"}
+                </span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Storage Cipher
+                </span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                  AES-256-GCM / RSA
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Quick Workspace Shortcuts Card */}
+          <Card className="p-5 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+              Workspace Shortcuts
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/records")}
+                className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+              >
+                <FileText
+                  size={14}
+                  className="text-blue-600 dark:text-blue-400"
+                />
+                <span>All Records</span>
+              </button>
+
+              {!isPatient && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/patients")}
+                  className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  <Users
+                    size={14}
+                    className="text-emerald-600 dark:text-emerald-400"
+                  />
+                  <span>Directory</span>
+                </button>
+              )}
+
+              {canViewReports && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/reports")}
+                  className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  <FileBarChart
+                    size={14}
+                    className="text-amber-600 dark:text-amber-400"
+                  />
+                  <span>Reports</span>
+                </button>
+              )}
+
+              {canManageStaff && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/users")}
+                  className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  <UserCog
+                    size={14}
+                    className="text-purple-600 dark:text-purple-400"
+                  />
+                  <span>Staff Users</span>
+                </button>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

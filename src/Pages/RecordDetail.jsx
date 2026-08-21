@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { Card, EncBadge } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../components/Toast";
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
@@ -65,52 +67,81 @@ function getFileName(filePath) {
 export default function RecordDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const showToast = useToast();
 
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [attachFile, setAttachFile] = useState(null);
+  const [attaching, setAttaching] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
+    const loadRecord = (mounted = { current: true }) => {
+      setLoading(true);
+      setLoadError("");
+      setImageFailed(false);
 
-    setLoading(true);
-    setLoadError("");
-    setRecord(null);
-    setImageFailed(false);
+      api
+        .getRecord(id)
+        .then((data) => {
+          if (mounted.current) {
+            setRecord(data);
+          }
+        })
+        .catch((err) => {
+          if (!mounted.current) return;
 
-    api
-      .getRecord(id)
-      .then((data) => {
-        if (mounted) {
-          setRecord(data);
-        }
-      })
-      .catch((err) => {
-        if (!mounted) return;
-
-        if (err instanceof TypeError) {
-          setLoadError(
-            "Could not reach the server — it may be waking up. Try refreshing shortly.",
-          );
-        } else {
-          setLoadError(
-            err?.message ||
-              "Could not load this record — you may not have permission to view its contents.",
-          );
-        }
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
+          if (err instanceof TypeError) {
+            setLoadError(
+              "Could not reach the server — it may be waking up. Try refreshing shortly.",
+            );
+          } else {
+            setLoadError(
+              err?.message ||
+                "Could not load this record — you may not have permission to view its contents.",
+            );
+          }
+        })
+        .finally(() => {
+          if (mounted.current) {
+            setLoading(false);
+          }
+        });
     };
-  }, [id]);
+
+    useEffect(() => {
+      const mounted = { current: true };
+      setRecord(null);
+      loadRecord(mounted);
+      return () => {
+        mounted.current = false;
+      };
+    }, [id]);
+
+    const handleAttach = async (e) => {
+      e.preventDefault();
+      if (!attachFile) return;
+
+      setAttaching(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", attachFile);
+        await api.attachFileToRecord(record.id, formData);
+        showToast("File attached successfully");
+        setAttachFile(null);
+        loadRecord();
+      } catch (err) {
+        if (err instanceof TypeError) {
+          showToast("Could not reach the server — try again shortly", "info");
+        } else {
+          showToast(err.message || "Could not attach file", "info");
+        }
+      } finally {
+        setAttaching(false);
+      }
+    };
 
   if (loading) {
     return (
@@ -268,7 +299,7 @@ export default function RecordDetail() {
       </Card>
 
       {/* Attachment */}
-      {record.file_path && (
+      {record.file_path ? (
         <Card className="p-5">
           <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
             <div>
@@ -368,7 +399,40 @@ export default function RecordDetail() {
               </div>
             </div>
           )}
-        </Card>
+                </Card>
+      ) : (
+        hasPermission("upload_records") && (
+          <Card className="p-5">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Attachment
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                No file attached to this record yet.
+              </p>
+            </div>
+
+            <form onSubmit={handleAttach} className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <input
+                type="file"
+                onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
+                className="text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-slate-800 file:text-xs file:font-medium file:text-slate-700 dark:file:text-slate-200"
+              />
+              <button
+                type="submit"
+                disabled={!attachFile || attaching}
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              >
+                {attaching ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Upload size={13} />
+                )}
+                {attaching ? "Attaching..." : "Attach File"}
+              </button>
+            </form>
+          </Card>
+        )
       )}
 
       {/* Integrity */}

@@ -1,384 +1,334 @@
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { LogOut, X, PanelLeftClose, PanelLeftOpen, Pin } from "lucide-react";
-
-import { hospital } from "../lib/mockData";
-import { api } from "../lib/api";
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  UploadCloud,
+  History,
+  UserCog,
+  UserPlus,
+  Link2,
+  FileBarChart,
+  Settings,
+  Shield,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LogOut,
+  X,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { ROLE_LABELS, getNavigationForRole } from "../config/navigation";
+import { getAvatarUrl } from "../lib/avatar";
+import { ROLE_LABELS, ROLES } from "../config/navigation";
 import { useScrollFade } from "../lib/useScrollFade";
 
-export default function Sidebar({
-  isOpen,
-  onClose,
-  pinned = false,
-  onTogglePin,
-}) {
+export default function Sidebar({ isOpen, onClose, pinned, onTogglePin }) {
   const navigate = useNavigate();
-  const navScrollRef = useScrollFade();
-  const { user, role, hasPermission } = useAuth();
-
-  const navItems = getNavigationForRole(role).filter((item) =>
-    hasPermission(item.permission),
-  );
-
   const location = useLocation();
+  const { user, role, logout, hasPermission } = useAuth();
+  const navScrollRef = useScrollFade(700);
 
-  const isItemActive = (item) => {
-    const path = location.pathname;
-    if (path === item.path) return true;
-    if (!path.startsWith(item.path + "/")) return false;
-    return !navItems.some(
-      (other) =>
-        other.path !== item.path &&
-        other.path.length > item.path.length &&
-        (path === other.path || path.startsWith(other.path + "/")),
-    );
-  };
+  const isAdmin = role === ROLES.ADMIN;
+  const isAuditor = role === ROLES.AUDITOR;
+  const isPatient = role === ROLES.PATIENT;
 
-  const displayName = user?.first_name
-    ? role === "doctor"
-      ? `Dr. ${user.first_name} ${user.last_name}`
-      : `${user.first_name} ${user.last_name}`
-    : "Guest";
+  // Permission-based — same fix as Dashboard. This is also what was
+  // silently missing "Create Staff" entirely: there was nowhere in the
+  // sidebar that pointed at staff creation at all, only staff *viewing*.
+  const canUpload = hasPermission("upload_records");
+  const canManageStaff = hasPermission("manage_users");
+  const canGrantPortal = hasPermission("link_patient_identity");
+  const canViewReports = isAdmin || isAuditor || role === ROLES.RECORDS_OFFICER;
 
-  const displayRole = ROLE_LABELS[role] || role || "Guest";
+  const name = user?.first_name
+    ? `${user.first_name} ${user.last_name}`
+    : "User";
+  const department = user?.department || "General";
+  const roleDisplay = ROLE_LABELS?.[role] || role || "Staff";
 
   const handleSignOut = async () => {
-    try {
-      await api.logout();
-    } catch {
-      // Continue local logout even if backend logout fails.
-    }
-
-    localStorage.removeItem("medvault_token");
-    localStorage.removeItem("medvault_user");
-
+    if (onClose) onClose();
+    await logout();
     navigate("/login");
   };
 
+  const navItemClass = ({ isActive }) =>
+    `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors group relative ${
+      isActive
+        ? "bg-blue-600 text-white shadow-xs"
+        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+    } ${!pinned ? "lg:justify-center lg:px-0" : ""}`;
+
   return (
     <>
-      {/* =========================================================
-          MOBILE OVERLAY
-      ========================================================= */}
+      {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-slate-950/40 backdrop-blur-[1px] z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* =========================================================
-          SIDEBAR
-      ========================================================= */}
+      {/* Persistent Dark Sidebar Shell */}
       <aside
-        className={`
-          fixed
-          inset-y-0
-          h-screen
-          left-0
-          z-50
-          flex
-          flex-col
-          bg-slate-800
-          border-r
-          border-white/5
-          shadow-xl
-          lg:shadow-none
-
-          transition-[width,transform]
-          duration-200
-          ease-out
-
-          lg:relative
-
-          ${pinned ? "lg:w-60" : "lg:w-[68px]"}
-
-          w-[260px]
-
-          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        `}
+        className={`fixed lg:static top-0 left-0 bottom-0 bg-slate-900 border-r border-slate-800 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        } ${pinned ? "w-64" : "w-64 lg:w-20"} shrink-0 h-screen`}
       >
-        {/* =======================================================
-            BRAND HEADER
-        ======================================================= */}
-        <div
-          className={`
-    h-[72px]
-    shrink-0
-    border-b
-    border-white/5
-    flex
-    items-center
-    relative
-    ${pinned ? "px-5" : "justify-center px-2"}
-  `}
-        >
-          <button
-            type="button"
-            onClick={onTogglePin}
-            title={pinned ? "Collapse sidebar" : "Expand sidebar"}
-            aria-label={pinned ? "Collapse sidebar" : "Expand sidebar"}
-            className={`
-      group
-      relative
-      flex
-      items-center
-      shrink-0
-      rounded-lg
-      transition-colors
-      hover:bg-white/5
-      ${pinned ? "gap-2.5" : "justify-center"}
-    `}
-          >
-            <img
-              src="/medvaultlogo.png"
-              alt="MedVault"
-              className="w-[34px] h-[34px] object-contain shrink-0"
-            />
-
-            {pinned && (
-              <div className="min-w-0 text-left">
-                <div className="font-display text-base font-bold text-white leading-tight">
-                  Med<span className="text-blue-400">Vault</span>
-                </div>
-
-                <div className="text-[10px] text-slate-500 truncate">
-                  {hospital}
-                </div>
-              </div>
-            )}
-
-            {/* Collapsed hover icon */}
-            {!pinned && (
-              <span
-                className="
-          absolute
-          inset-0
-          flex
-          items-center
-          justify-center
-          rounded-lg
-          bg-slate-800/95
-          opacity-0
-          group-hover:opacity-100
-          transition-opacity
-        "
-              >
-                <PanelLeftOpen size={18} className="text-slate-300" />
-              </span>
-            )}
-
-            {/* Expanded hover icon */}
-            {pinned && (
-              <span
-                className="
-          absolute
-          right-0
-          top-1/2
-          -translate-y-1/2
-          w-8
-          h-8
-          flex
-          items-center
-          justify-center
-          rounded-md
-          bg-slate-800
-          text-slate-400
-          opacity-0
-          group-hover:opacity-100
-          transition-opacity
-        "
-              >
-                <PanelLeftClose size={17} />
-              </span>
-            )}
-          </button>
-
-          {/* Mobile close remains separate */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close navigation"
-            className="lg:hidden ml-auto w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5"
-          >
-            <X size={19} />
-          </button>
-        </div>
-        {/* =======================================================
-            NAVIGATION
-        ======================================================= */}
-        <nav
-          ref={navScrollRef}
-          className={`flex-1 py-3 overflow-x-hidden ${
-            pinned ? "overflow-y-auto scroll-fade" : "overflow-y-hidden"
-          }`}
-        >
-          {Object.entries(
-            navItems.reduce((groups, current) => {
-              const key = current.group || "";
-              if (!groups[key]) groups[key] = [];
-              groups[key].push(current);
-              return groups;
-            }, {}),
-          ).map(([groupLabel, groupItems], groupIndex) => (
-            <div
-              key={groupLabel}
-              className={
-                groupIndex > 0 ? "mt-3 pt-3 border-t border-white/5" : ""
-              }
-            >
-              {pinned && (
-                <div className="px-5 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  {groupLabel}
-                </div>
-              )}
-
-              {groupItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={onClose}
-                  title={!pinned ? item.label : undefined}
-                  className={() =>
-                    `
-    group
-    relative
-    flex
-    items-center
-    h-10
-    text-[13.5px]
-    border-l-[2.5px]
-    transition-colors
-
-    ${pinned ? "gap-2.5 px-5" : "justify-center px-0"}
-
-    ${
-      isItemActive(item)
-        ? "text-blue-400 bg-blue-600/10 border-blue-600"
-        : "text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/5"
-    }
-    `
-                  }
-                >
-                  <item.icon size={17} className="shrink-0" />
-
-                  {pinned && (
-                    <span className="flex-1 truncate">{item.label}</span>
-                  )}
-
-                  {!pinned && (
-                    <span
-                      className="
-                pointer-events-none
-                absolute
-                left-[58px]
-                z-[60]
-                whitespace-nowrap
-                rounded-md
-                bg-slate-950
-                px-2.5
-                py-1.5
-                text-[11px]
-                font-medium
-                text-white
-                opacity-0
-                translate-x-1
-                group-hover:opacity-100
-                group-hover:translate-x-0
-                transition-all
-              "
-                    >
-                      {item.label}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          ))}
-        </nav>
-        {/* =======================================================
-            USER AREA
-        ======================================================= */}
-        <div className="shrink-0 border-t border-white/5 p-3">
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* Header - Hover Group for Pin Icon */}
           <div
-            className={`
-              flex
-              items-center
-              ${pinned ? "gap-2.5 px-2 mb-3" : "justify-center mb-2"}
-            `}
+            className={`group/header h-16 flex items-center border-b border-slate-800 shrink-0 px-4 justify-between ${
+              !pinned ? "lg:justify-center" : ""
+            }`}
           >
-            <img
-              src={`https://i.pravatar.cc/64?u=${user?.email || "demo"}`}
-              alt=""
-              className="w-[34px] h-[34px] rounded-full object-cover shrink-0"
-            />
-
-            {pinned && (
-              <div className="min-w-0">
-                <div className="text-[13px] font-semibold text-slate-300 truncate">
-                  {displayName}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0">
+                <Shield size={18} />
+              </div>
+              <div className={`min-w-0 ${!pinned ? "lg:hidden" : ""}`}>
+                <div className="font-display text-sm font-bold text-white truncate">
+                  MedVault
                 </div>
-
-                <div className="text-[11px] text-slate-500 truncate">
-                  {displayRole}
+                <div className="text-[10px] text-slate-400 truncate">
+                  Security Engine
                 </div>
               </div>
+            </div>
+
+            {/* Mobile Close Button (X) */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close navigation drawer"
+              className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {onTogglePin && (
+              <button
+                type="button"
+                onClick={onTogglePin}
+                className={`hidden lg:flex w-7 h-7 items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-all cursor-pointer ${
+                  pinned
+                    ? "opacity-0 group-hover/header:opacity-100"
+                    : "opacity-100"
+                }`}
+              >
+                {pinned ? (
+                  <PanelLeftClose size={16} />
+                ) : (
+                  <PanelLeftOpen size={16} />
+                )}
+              </button>
             )}
           </div>
 
+          {/* Nav List with Scroll Fade */}
+          <nav
+            ref={navScrollRef}
+            className="flex-1 overflow-y-auto fade-scroll px-3 py-4 space-y-6"
+          >
+            <div>
+              <div
+                className={`text-[10px] font-semibold uppercase text-slate-500 px-3 mb-2 ${
+                  !pinned ? "lg:hidden" : ""
+                }`}
+              >
+                Workspace
+              </div>
+              <div className="space-y-1">
+                <NavLink
+                  to="/dashboard"
+                  className={navItemClass}
+                  onClick={onClose}
+                >
+                  <LayoutDashboard size={17} className="shrink-0" />
+                  <span className={!pinned ? "lg:hidden" : ""}>Dashboard</span>
+                </NavLink>
+                {!isPatient && (
+                  <NavLink
+                    to="/patients"
+                    className={({ isActive }) =>
+                      navItemClass({
+                        isActive:
+                          isActive &&
+                          !location.pathname.startsWith(
+                            "/patients/link-portal",
+                          ),
+                      })
+                    }
+                    onClick={onClose}
+                  >
+                    <Users size={17} className="shrink-0" />
+                    <span className={!pinned ? "lg:hidden" : ""}>Patients</span>
+                  </NavLink>
+                )}
+                {canGrantPortal && (
+                  <NavLink
+                    to="/patients/link-portal"
+                    className={navItemClass}
+                    onClick={onClose}
+                  >
+                    <Link2 size={17} className="shrink-0" />
+                    <span className={!pinned ? "lg:hidden" : ""}>
+                      Grant Portal Access
+                    </span>
+                  </NavLink>
+                )}
+                <NavLink
+                  to="/records"
+                  className={navItemClass}
+                  onClick={onClose}
+                >
+                  <FileText size={17} className="shrink-0" />
+                  <span className={!pinned ? "lg:hidden" : ""}>
+                    Medical Records
+                  </span>
+                </NavLink>
+                {canUpload && (
+                  <NavLink
+                    to="/upload"
+                    className={navItemClass}
+                    onClick={onClose}
+                  >
+                    <UploadCloud size={17} className="shrink-0" />
+                    <span className={!pinned ? "lg:hidden" : ""}>
+                      Upload Record
+                    </span>
+                  </NavLink>
+                )}
+              </div>
+            </div>
+
+            {(isAdmin || isAuditor || canViewReports) && (
+              <div>
+                <div
+                  className={`text-[10px] font-semibold uppercase text-slate-500 px-3 mb-2 ${
+                    !pinned ? "lg:hidden" : ""
+                  }`}
+                >
+                  Hospital Operations
+                </div>
+                <div className="space-y-1">
+                  {canViewReports && (
+                    <NavLink
+                      to="/reports"
+                      className={navItemClass}
+                      onClick={onClose}
+                    >
+                      <FileBarChart size={17} className="shrink-0" />
+                      <span className={!pinned ? "lg:hidden" : ""}>
+                        Reports
+                      </span>
+                    </NavLink>
+                  )}
+                  {(isAdmin || isAuditor) && (
+                    <NavLink
+                      to="/audit"
+                      className={navItemClass}
+                      onClick={onClose}
+                    >
+                      <History size={17} className="shrink-0" />
+                      <span className={!pinned ? "lg:hidden" : ""}>
+                        Audit Ledger
+                      </span>
+                    </NavLink>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {canManageStaff && (
+              <div>
+                <div
+                  className={`text-[10px] font-semibold uppercase text-slate-500 px-3 mb-2 ${
+                    !pinned ? "lg:hidden" : ""
+                  }`}
+                >
+                  Administration
+                </div>
+                <div className="space-y-1">
+                  <NavLink
+                    to="/users"
+                    end
+                    className={navItemClass}
+                    onClick={onClose}
+                  >
+                    <UserCog size={17} className="shrink-0" />
+                    <span className={!pinned ? "lg:hidden" : ""}>
+                      Staff Users
+                    </span>
+                  </NavLink>
+                  <NavLink
+                    to="/users/new"
+                    className={navItemClass}
+                    onClick={onClose}
+                  >
+                    <UserPlus size={17} className="shrink-0" />
+                    <span className={!pinned ? "lg:hidden" : ""}>
+                      Create Staff
+                    </span>
+                  </NavLink>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <div
+                className={`text-[10px] font-semibold uppercase text-slate-500 px-3 mb-2 ${
+                  !pinned ? "lg:hidden" : ""
+                }`}
+              >
+                Preferences
+              </div>
+              <div className="space-y-1">
+                <NavLink
+                  to="/settings"
+                  className={navItemClass}
+                  onClick={onClose}
+                >
+                  <Settings size={17} className="shrink-0" />
+                  <span className={!pinned ? "lg:hidden" : ""}>Settings</span>
+                </NavLink>
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        {/* Footer */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/50 space-y-2">
+          {/* Identity Widget */}
+          <div
+            className={`flex items-center gap-2.5 p-2 rounded-xl bg-slate-800 border border-slate-700/50 shadow-2xs ${
+              !pinned ? "lg:justify-center lg:p-1.5" : ""
+            }`}
+          >
+            <img
+              src={getAvatarUrl(user?.email)}
+              alt=""
+              className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-slate-700"
+            />
+            <div className={`min-w-0 flex-1 ${!pinned ? "lg:hidden" : ""}`}>
+              <div className="text-xs font-semibold text-slate-200 truncate">
+                {name}
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                {department} · {roleDisplay}
+              </div>
+            </div>
+          </div>
+
+          {/* Sign Out Button */}
           <button
             type="button"
             onClick={handleSignOut}
-            title={!pinned ? "Sign Out" : undefined}
-            className={`
-              group
-              relative
-              flex
-              items-center
-              text-slate-400
-              hover:text-slate-200
-              hover:bg-white/5
-              rounded-lg
-              text-[13px]
-              transition-colors
-
-              ${
-                pinned
-                  ? "gap-2.5 w-full px-2 py-2"
-                  : "justify-center w-full h-9"
-              }
-            `}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer ${
+              !pinned ? "lg:justify-center lg:px-0" : ""
+            }`}
           >
-            <LogOut size={16} className="shrink-0" />
-
-            {pinned && <span>Sign Out</span>}
-
-            {!pinned && (
-              <span
-                className="
-                  pointer-events-none
-                  absolute
-                  left-[58px]
-                  z-[60]
-                  whitespace-nowrap
-                  rounded-md
-                  bg-slate-950
-                  px-2.5
-                  py-1.5
-                  text-[11px]
-                  font-medium
-                  text-white
-                  opacity-0
-                  translate-x-1
-                  group-hover:opacity-100
-                  group-hover:translate-x-0
-                  transition-all
-                "
-              >
-                Sign Out
-              </span>
-            )}
+            <LogOut size={15} className="shrink-0" />
+            <span className={!pinned ? "lg:hidden" : ""}>Sign Out</span>
           </button>
         </div>
       </aside>

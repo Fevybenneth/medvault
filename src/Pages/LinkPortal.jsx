@@ -1,7 +1,18 @@
 import { useState, useEffect } from "react";
-import { Search, Mail, Lock, Link2, X, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  Search,
+  Mail,
+  Lock,
+  Link2,
+  X,
+  Loader2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { Card, Button, Badge } from "../components/ui";
+
 import { useToast } from "../components/Toast";
 
 // Portal Access — dedicated lookup + action page, distinct from the
@@ -14,6 +25,8 @@ import { useToast } from "../components/Toast";
 // access are different actions with different audit consequences
 // (patient_created vs patient_portal_linked).
 // Visible to admin + records_officer only, matching link_patient_identity.
+// Pagination now mirrors Patients.jsx — same page/limit/total contract
+// against GET /patients, same control layout.
 
 export function GrantModal({ patient, onClose, onGranted }) {
   const showToast = useToast();
@@ -57,7 +70,7 @@ export function GrantModal({ patient, onClose, onGranted }) {
       onClick={onClose}
     >
       <Card
-        className="w-full p-6"
+        className="w-full p-6 max-h-[85vh] overflow-y-auto"
         style={{ maxWidth: 440 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -191,20 +204,34 @@ function PatientCard({ patient, onGrant }) {
   );
 }
 
+const PAGE_SIZE = 10;
+
 export default function LinkPortal() {
-  const showToast = useToast();
   const [search, setSearch] = useState("");
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [grantTarget, setGrantTarget] = useState(null);
 
-  const loadPatients = (searchTerm = "") => {
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const loadPatients = (searchTerm = "", pageNum = 1) => {
     setLoading(true);
     setLoadError("");
     api
-      .getPatients({ search: searchTerm || undefined })
-      .then((data) => setPatients(data?.patients || []))
+      .getPatients({
+        search: searchTerm || undefined,
+        page: pageNum,
+        limit: PAGE_SIZE,
+      })
+      .then((data) => {
+        setPatients(data?.patients || []);
+        setTotal(data?.total || 0);
+        setTotalPages(data?.pages || 1);
+        setPage(data?.page || pageNum);
+      })
       .catch((err) => {
         if (err instanceof TypeError) {
           setLoadError(
@@ -222,7 +249,7 @@ export default function LinkPortal() {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => loadPatients(search), 400);
+    const t = setTimeout(() => loadPatients(search, 1), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -234,8 +261,8 @@ export default function LinkPortal() {
           Portal Access
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Search any patient to view or grant portal login access. This does
-          not create a new patient identity — use Register Patient for that.
+          Search any patient to view or grant portal login access. This does not
+          create a new patient identity — use Register Patient for that.
         </p>
       </div>
 
@@ -276,11 +303,39 @@ export default function LinkPortal() {
         </div>
       )}
 
+      {!loading && !loadError && patients.length > 0 && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <div className="text-[13px] text-slate-500">
+            Showing {(page - 1) * PAGE_SIZE + 1}–
+            {(page - 1) * PAGE_SIZE + patients.length} of {total} patients
+          </div>
+          <div className="flex gap-1.5 items-center">
+            <button
+              disabled={page <= 1}
+              onClick={() => loadPatients(search, page - 1)}
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button className="min-w-[30px] h-7 rounded-md bg-blue-600 text-white text-xs">
+              {page}
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => loadPatients(search, page + 1)}
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {grantTarget && (
         <GrantModal
           patient={grantTarget}
           onClose={() => setGrantTarget(null)}
-          onGranted={() => loadPatients(search)}
+          onGranted={() => loadPatients(search, page)}
         />
       )}
     </div>

@@ -15,6 +15,7 @@ import Records from "./Pages/Records";
 import RecordDetail from "./Pages/RecordDetail";
 import Upload from "./Pages/Upload";
 import Users from "./Pages/Users";
+import CreateStaff from "./Pages/CreateStaff";
 import Audit from "./Pages/Audit";
 import Reports from "./Pages/Reports";
 import Settings from "./Pages/Settings";
@@ -98,7 +99,6 @@ function App() {
     <Routes>
       <Route path="/" element={<Splash />} />
       <Route path="/login" element={<Login />} />
-
       <Route
         path="/dashboard"
         element={
@@ -230,6 +230,20 @@ function App() {
           </ProtectedRoute>
         }
       />
+      // new Route, placed right after the existing /users route block:
+      <Route
+        path="/users/new"
+        element={
+          <ProtectedRoute
+            permission="manage_users"
+            message="Creating staff accounts is restricted to administrators."
+          >
+            <AppLayout>
+              <CreateStaff />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/settings"
         element={
@@ -240,7 +254,6 @@ function App() {
           </ProtectedRoute>
         }
       />
-
       <Route path="/403" element={<ErrorPage code={403} />} />
       <Route path="/500" element={<ErrorPage code={500} />} />
       <Route path="*" element={<ErrorPage code={404} />} />

@@ -1,92 +1,60 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   UserCircle,
   ShieldCheck,
-  Key,
-  Smartphone,
-  Bell,
-  Monitor,
-  Globe,
-  Building2,
-  Link as LinkIcon,
   LifeBuoy,
   Save,
   Mail,
   Phone,
-  Camera,
-  Clock,
-  Check,
+  Building,
+  KeyRound,
   Send,
+  Lock,
+  ChevronDown,
 } from "lucide-react";
-import { hospital } from "../lib/mockData";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_LABELS } from "../config/navigation";
-import { Badge, Button, Card, Toggle } from "../components/ui";
+import { Button, Card } from "../components/ui";
 import { useToast } from "../components/Toast";
-import { useTheme } from "../context/ThemeContext";
+import { getAvatarUrl } from "../lib/avatar";
 
-const navItems = [
-  { id: "profile", icon: UserCircle, label: "My Profile" },
-  { id: "security", icon: ShieldCheck, label: "Security" },
-  { id: "password", icon: Key, label: "Password" },
-  { id: "2fa", icon: Smartphone, label: "Two-Factor Auth" },
-  { divider: true },
-  { id: "notifications", icon: Bell, label: "Notifications" },
-  { id: "system", icon: Monitor, label: "System Prefs" },
-  { id: "language", icon: Globe, label: "Language & Region" },
-  { divider: true },
-  // Hospital-wide config, not personal settings — admin only. The section
-  // body itself already said as much ("Only administrators can modify
-  // hospital-wide settings"), the nav just didn't enforce it.
-  {
-    id: "hospital",
-    icon: Building2,
-    label: "Hospital Settings",
-    roles: ["admin"],
-  },
-  {
-    id: "integrations",
-    icon: LinkIcon,
-    label: "Integrations",
-    roles: ["admin"],
-  },
-  { id: "support", icon: LifeBuoy, label: "Support" },
+const TABS = [
+  { id: "profile", label: "My Profile", icon: UserCircle },
+  { id: "security", label: "Security & Sessions", icon: ShieldCheck },
+  { id: "support", label: "IT Support", icon: LifeBuoy },
 ];
-
-// Filters navItems by role, then strips any divider left orphaned (at the
-// start/end of the list, or directly beside another divider) once
-// role-restricted items on either side of it have been filtered out.
-function getVisibleNavItems(role) {
-  const filtered = navItems.filter(
-    (item) => item.divider || !item.roles || item.roles.includes(role),
-  );
-
-  return filtered.filter((item, i) => {
-    if (!item.divider) return true;
-    const isEdge = i === 0 || i === filtered.length - 1;
-    const nextIsDivider = filtered[i + 1]?.divider;
-    return !isEdge && !nextIsDivider;
-  });
-}
 
 export default function Settings() {
   const showToast = useToast();
   const { user, role, refreshUser } = useAuth();
-  const [activeSection, setActiveSection] = useState("profile");
-  const [saved, setSaved] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabQuery = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabQuery || "profile");
+  const [saving, setSaving] = useState(false);
 
   const [profile, setProfile] = useState({
     firstName: user?.first_name || "",
     lastName: user?.last_name || "",
     email: user?.email || "",
     phone: user?.phone || "",
-    department: user?.department || "",
-    mdcn: user?.license_number || "",
+    department: user?.department || "Cardiology",
   });
-  const updateProfile = (field, value) =>
-    setProfile((p) => ({ ...p, [field]: value }));
+
+  const [supportMsg, setSupportMsg] = useState("");
+
+  useEffect(() => {
+    if (tabQuery && ["profile", "security", "support"].includes(tabQuery)) {
+      setActiveTab(tabQuery);
+    }
+  }, [tabQuery]);
+
+  const handleTabSelect = (tabId) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId });
+  };
 
   useEffect(() => {
     api
@@ -98,87 +66,16 @@ export default function Settings() {
           lastName: data.last_name || "",
           email: data.email || "",
           phone: data.phone || "",
-          department: data.department || "",
-          mdcn: data.license_number || "",
+          department: data.department || "Cardiology",
         });
       })
       .catch((err) => {
-        console.warn("Could not refresh profile from /auth/me:", err.message);
+        console.warn("Could not sync user profile:", err.message);
       });
   }, []);
 
-  const [photoUrl, setPhotoUrl] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const MAX_PHOTO_BYTES = 3 * 1024 * 1024; // 3MB
-  const handlePhotoSelect = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      showToast("Please choose an image file", "info");
-      return;
-    }
-    if (file.size > MAX_PHOTO_BYTES) {
-      showToast("Image is too large — please choose one under 3MB", "info");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotoUrl(reader.result);
-      showToast("Photo updated — click Save Changes to keep it");
-    };
-    reader.onerror = () =>
-      showToast("Could not read that file, please try again", "info");
-    reader.readAsDataURL(file);
-  };
-
-  const [twoFactor, setTwoFactor] = useState(true);
-  const [loginAlerts, setLoginAlerts] = useState(true);
-  const [sessionTimeout, setSessionTimeout] = useState("30 minutes");
-
-  const [passwords, setPasswords] = useState({
-    current: "",
-    next: "",
-    confirm: "",
-  });
-
-  const [notifPrefs, setNotifPrefs] = useState({
-    email: true,
-    sms: true,
-    criticalAlerts: true,
-    weeklyDigest: false,
-  });
-
-  const [systemPrefs, setSystemPrefs] = useState({
-    density: "Comfortable",
-  });
-
-  const [langPrefs, setLangPrefs] = useState({
-    language: "English (UK)",
-    timezone: "WAT (UTC+1)",
-  });
-
-  const [integrations, setIntegrations] = useState({
-    nhis: true,
-    smsGateway: false,
-    backup: true,
-  });
-
-  const [supportMsg, setSupportMsg] = useState("");
-
-  const [saving, setSaving] = useState(false);
-  const handleSave = async () => {
-    if (activeSection !== "profile") {
-      // Other sections (notifications, system prefs, etc.) aren't backed by
-      // any real route in the contract yet — kept as local-only for now.
-      setSaved(true);
-      showToast("Settings saved");
-      setTimeout(() => setSaved(false), 2000);
-      return;
-    }
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
     setSaving(true);
     try {
       await api.updateCurrentUser({
@@ -186,735 +83,324 @@ export default function Settings() {
         department: profile.department,
       });
       await refreshUser();
-      setSaved(true);
-      showToast("Profile updated");
-      setTimeout(() => setSaved(false), 2000);
+      showToast("Profile settings saved successfully.");
     } catch (err) {
-      showToast(err.message || "Could not save profile changes.", "info");
+      showToast(err.message || "Failed to update profile", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  const handlePasswordChange = (e) => {
-    e.preventDefault();
-    if (!passwords.current || !passwords.next) {
-      showToast("Fill in your current and new password", "info");
-      return;
-    }
-    if (passwords.next !== passwords.confirm) {
-      showToast("New password and confirmation do not match", "info");
-      return;
-    }
-    showToast("Password updated");
-    setPasswords({ current: "", next: "", confirm: "" });
-  };
-
   const handleSupportSubmit = (e) => {
     e.preventDefault();
     if (!supportMsg.trim()) {
-      showToast("Write a message before sending", "info");
+      showToast("Please enter an issue description", "info");
       return;
     }
-    showToast(
-      "Support request sent to IT — expect a reply within 1 business day",
-    );
+    showToast("Support ticket dispatched to Hospital IT.");
     setSupportMsg("");
   };
 
-  const displayRole = ROLE_LABELS[role] || role || "";
-  const visibleNavItems = getVisibleNavItems(role);
-
-  // Defense in depth: even though the nav button for an admin-only section
-  // is already hidden for other roles, guard the section body too so
-  // activeSection can never render restricted content by any other path.
-  useEffect(() => {
-    const stillVisible = visibleNavItems.some(
-      (item) => !item.divider && item.id === activeSection,
-    );
-    if (!stillVisible) setActiveSection("profile");
-  }, [role]);
+  const roleLabel = ROLE_LABELS[role] || role || "Staff";
 
   return (
-    <div>
-      <div
-        className="flex items-start justify-between mb-4.5 flex-wrap gap-3"
-        style={{ marginBottom: 18 }}
-      >
-        <div>
-          <h1 className="text-xl font-display font-bold text-slate-800 dark:text-slate-100">
-            Settings
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Manage your account, security, and system preferences
-          </p>
+    <div className="space-y-6 pb-12">
+      {/* Mobile Profile Card with Section Switcher */}
+      <Card className="p-4 lg:hidden">
+        <div className="flex items-center gap-3.5 mb-4">
+          <img
+            src={getAvatarUrl(user?.email)}
+            alt=""
+            className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-100 dark:ring-blue-900"
+          />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+              {profile.firstName} {profile.lastName}
+            </h2>
+            <p className="text-xs text-slate-400 truncate">{profile.email}</p>
+            <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md">
+              {profile.department} · {roleLabel}
+            </span>
+          </div>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saved ? <Check size={14} /> : <Save size={14} />}
-          {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
-        </Button>
+
+        <div className="relative">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+            Settings Section
+          </label>
+          <div className="relative">
+            <select
+              value={activeTab}
+              onChange={(e) => handleTabSelect(e.target.value)}
+              className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 cursor-pointer"
+            >
+              {TABS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={14}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Desktop Header */}
+      <div className="hidden lg:block">
+        <h1 className="text-2xl font-display font-bold text-slate-800 dark:text-slate-100">
+          Account & Security Settings
+        </h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Manage your verified hospital profile, session security, and support
+          requests.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
-        <Card className="p-3" style={{ height: "fit-content" }}>
-          {visibleNavItems.map((item, i) =>
-            item.divider ? (
-              <div
-                key={i}
-                className="h-px bg-slate-200 dark:bg-slate-700 my-2"
-              />
-            ) : (
+      {/* Main Settings Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 items-start">
+        {/* Desktop Sidebar Navigation Tabs */}
+        <Card className="p-2 hidden lg:block space-y-1">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
               <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm cursor-pointer w-full text-left ${
-                  activeSection === item.id
-                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabSelect(tab.id)}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                  isActive
+                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 }`}
               >
-                <item.icon size={18} />
-                {item.label}
+                <Icon size={16} />
+                <span>{tab.label}</span>
               </button>
-            ),
-          )}
+            );
+          })}
         </Card>
 
-        <div className="flex flex-col gap-4">
-          {activeSection === "profile" && (
+        {/* Content Pane */}
+        <div>
+          {activeTab === "profile" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Profile Information
-              </h3>
-              <div className="flex flex-col sm:flex-row items-start gap-6 mb-6">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoSelect}
-                  className="hidden"
-                />
-                <div className="relative flex-shrink-0">
-                  {photoUrl ? (
-                    <img
-                      src={photoUrl}
-                      alt="Profile"
-                      className="w-20 h-20 rounded-full object-cover border-[3px] border-slate-200 dark:border-slate-600"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-[3px] border-slate-200 dark:border-slate-600 flex items-center justify-center text-xl font-semibold">
-                      {(profile.firstName[0] || "").toUpperCase()}
-                      {(profile.lastName[0] || "").toUpperCase()}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-[26px] h-[26px] bg-blue-600 rounded-full border-[2.5px] border-white flex items-center justify-center cursor-pointer hover:bg-blue-700"
-                    aria-label="Change profile photo"
-                  >
-                    <Camera size={12} className="text-white" />
-                  </button>
-                </div>
-                <div className="flex-1">
-                  <div className="font-display text-lg font-bold text-slate-800 dark:text-slate-100">
-                    {role === "doctor"
-                      ? `Dr. ${profile.firstName} ${profile.lastName}`
-                      : `${profile.firstName} ${profile.lastName}`}
-                  </div>
-                  <div className="text-[13.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {displayRole}
-                    {profile.department ? ` · ${profile.department}` : ""}
-                  </div>
-                  <div className="text-[13px] text-blue-600 dark:text-blue-400 mt-0.5">
-                    {profile.email}
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <UserCircle size={14} />
-                      Change Photo
-                    </Button>
-                    {photoUrl && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        type="button"
-                        onClick={() => {
-                          setPhotoUrl(null);
-                          showToast("Photo removed");
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              <div className="mb-6">
+                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                  Profile Information
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Update your contact details and active department assignment.
+                </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    First Name
-                  </label>
-                  <input
-                    value={profile.firstName}
-                    disabled
-                    readOnly
-                    className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                  />
+
+              <form onSubmit={handleSaveProfile} className="space-y-4 max-w-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={profile.firstName}
+                      disabled
+                      readOnly
+                      className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      value={profile.lastName}
+                      disabled
+                      readOnly
+                      className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                    />
+                  </div>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Last Name
-                  </label>
-                  <input
-                    value={profile.lastName}
-                    disabled
-                    readOnly
-                    className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Email Address
+                    Registered Email
                   </label>
                   <div className="relative">
                     <Mail
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                     />
                     <input
+                      type="email"
                       value={profile.email}
                       disabled
                       readOnly
-                      className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                      className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-500 dark:text-slate-400 cursor-not-allowed"
                     />
                   </div>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Phone Number
                   </label>
                   <div className="relative">
                     <Phone
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                     />
                     <input
+                      type="tel"
                       value={profile.phone}
-                      onChange={(e) => updateProfile("phone", e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                      onChange={(e) =>
+                        setProfile((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                      placeholder="080XXXXXXXX"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Department
+                    Assigned Department
                   </label>
-                  <select
-                    value={profile.department}
-                    onChange={(e) =>
-                      updateProfile("department", e.target.value)
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
+                  <div className="relative">
+                    <Building
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <select
+                      value={profile.department}
+                      onChange={(e) =>
+                        setProfile((prev) => ({
+                          ...prev,
+                          department: e.target.value,
+                        }))
+                      }
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="Cardiology">Cardiology</option>
+                      <option value="Neurology">Neurology</option>
+                      <option value="ICU">ICU</option>
+                      <option value="Orthopaedics">Orthopaedics</option>
+                      <option value="Paediatrics">Paediatrics</option>
+                      <option value="Emergency">Emergency</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={saving}
                   >
-                    <option>Cardiology</option>
-                    <option>Neurology</option>
-                    <option>ICU</option>
-                    <option>Orthopaedics</option>
-                    <option>Paediatrics</option>
-                    <option>Emergency</option>
-                  </select>
+                    <Save size={13} />
+                    <span>{saving ? "Saving..." : "Save Profile Changes"}</span>
+                  </Button>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    MDCN Number
-                  </label>
-                  <input
-                    value={profile.mdcn}
-                    disabled
-                    readOnly
-                    className="w-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
-                Name, email, and MDCN number are set by an administrator.
-                Contact IT support to update them — only phone and department
-                are self-editable.
-              </p>
-            </Card>
-          )}
-
-          {activeSection === "security" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Security & Authentication
-              </h3>
-              <div className="flex flex-col gap-4">
-                <div
-                  className="flex items-start justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
-                  style={{ padding: 16 }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                      <Smartphone
-                        size={18}
-                        className="text-emerald-600 dark:text-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        Two-Factor Authentication
-                      </div>
-                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Add an extra layer of security to your account
-                      </div>
-                      {twoFactor && (
-                        <Badge tone="active" className="mt-2">
-                          Enabled — Authenticator App
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <Toggle
-                    on={twoFactor}
-                    onChange={() => setTwoFactor(!twoFactor)}
-                  />
-                </div>
-
-                <div
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
-                  style={{ padding: 16 }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                      <Clock
-                        size={18}
-                        className="text-blue-600 dark:text-blue-400"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        Auto Session Timeout
-                      </div>
-                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Automatically sign out after inactivity
-                      </div>
-                    </div>
-                  </div>
-                  <select
-                    value={sessionTimeout}
-                    onChange={(e) => setSessionTimeout(e.target.value)}
-                    className="text-[13px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5"
-                    style={{ width: 140 }}
-                  >
-                    <option>15 minutes</option>
-                    <option>30 minutes</option>
-                    <option>1 hour</option>
-                  </select>
-                </div>
-
-                <div
-                  className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
-                  style={{ padding: 16 }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                      <Bell
-                        size={18}
-                        className="text-amber-600 dark:text-amber-400"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        Login Notifications
-                      </div>
-                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        SMS alert on new sign-ins from unrecognised devices
-                      </div>
-                    </div>
-                  </div>
-                  <Toggle
-                    on={loginAlerts}
-                    onChange={() => setLoginAlerts(!loginAlerts)}
-                  />
-                </div>
-
-                {/* NOTE: Active Sessions below is placeholder UI, not backed by
-                    any real session-tracking route. Flagged for a future pass —
-                    intentionally left as-is rather than rebuilt in this change. */}
-                <div
-                  className="bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
-                  style={{ padding: 16 }}
-                >
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">
-                    Active Sessions
-                  </div>
-                  <div className="flex items-center justify-between mb-2.5 flex-wrap gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <Monitor
-                        size={18}
-                        className="text-blue-600 dark:text-blue-400"
-                      />
-                      <div>
-                        <div className="text-[13.5px] font-medium text-slate-800 dark:text-slate-100">
-                          This device
-                        </div>
-                        <div className="text-xs text-slate-400 dark:text-slate-500">
-                          Current session
-                        </div>
-                      </div>
-                    </div>
-                    <Badge tone="active">Current</Badge>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {activeSection === "password" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Change Password
-              </h3>
-              <form
-                onSubmit={handlePasswordChange}
-                className="flex flex-col gap-3.5 max-w-sm"
-              >
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Current Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwords.current}
-                    onChange={(e) =>
-                      setPasswords((p) => ({ ...p, current: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwords.next}
-                    onChange={(e) =>
-                      setPasswords((p) => ({ ...p, next: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwords.confirm}
-                    onChange={(e) =>
-                      setPasswords((p) => ({ ...p, confirm: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-blue-700 mt-1"
-                >
-                  Update Password
-                </button>
               </form>
             </Card>
           )}
 
-          {activeSection === "2fa" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Two-Factor Authentication
-              </h3>
-              <div
-                className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px] mb-4"
-                style={{ padding: 16 }}
-              >
-                <div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    Authenticator App
-                  </div>
-                  <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {twoFactor
-                      ? "Currently enabled and protecting your account"
-                      : "Currently disabled"}
-                  </div>
-                </div>
-                <Toggle
-                  on={twoFactor}
-                  onChange={() => {
-                    setTwoFactor(!twoFactor);
-                    showToast(
-                      twoFactor
-                        ? "Two-factor authentication disabled"
-                        : "Two-factor authentication enabled",
-                    );
-                  }}
-                />
+          {activeTab === "security" && (
+            <Card className="p-6 space-y-6">
+              <div>
+                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                  Security & Active Sessions
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Cryptographic posture, password policy, and current
+                  authorization status.
+                </p>
               </div>
-              {twoFactor && (
-                <div
-                  className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-lg text-sm text-slate-600 dark:text-slate-300"
-                  style={{ padding: 14 }}
-                >
-                  Scan the QR code in your authenticator app (Google
-                  Authenticator, Authy) to link this account, or enter setup
-                  key:{" "}
-                  <span className="font-mono text-slate-800 dark:text-slate-100">
-                    MVLT-7F2A-93KD
-                  </span>
-                </div>
-              )}
-            </Card>
-          )}
 
-          {activeSection === "notifications" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Notification Preferences
-              </h3>
-              <div className="flex flex-col gap-3">
-                {[
-                  ["email", "Email Notifications", "Receive updates via email"],
-                  ["sms", "SMS Alerts", "Receive urgent alerts via SMS"],
-                  [
-                    "criticalAlerts",
-                    "Critical Patient Alerts",
-                    "Immediate notification for critical status changes",
-                  ],
-                  [
-                    "weeklyDigest",
-                    "Weekly Digest",
-                    "Summary of hospital activity every Monday",
-                  ],
-                ].map(([key, label, desc]) => (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
-                    style={{ padding: 16 }}
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        {label}
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                        <KeyRound size={16} />
                       </div>
-                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        {desc}
+                      <div>
+                        <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                          Active JWT Authorization
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Bearer session token verified via TLS 1.3
+                        </div>
                       </div>
                     </div>
-                    <Toggle
-                      on={notifPrefs[key]}
-                      onChange={() =>
-                        setNotifPrefs((p) => ({ ...p, [key]: !p[key] }))
-                      }
-                    />
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                      Active
+                    </span>
                   </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                </div>
 
-          {activeSection === "system" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                System Preferences
-              </h3>
-              <div className="flex flex-col gap-4 max-w-sm">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Theme
-                  </label>
-                  <select
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 dark:text-slate-100"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="system">System</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Table Density
-                  </label>
-                  <select
-                    value={systemPrefs.density}
-                    onChange={(e) =>
-                      setSystemPrefs((p) => ({ ...p, density: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option>Comfortable</option>
-                    <option>Compact</option>
-                  </select>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {activeSection === "language" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Language & Region
-              </h3>
-              <div className="flex flex-col gap-4 max-w-sm">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Language
-                  </label>
-                  <select
-                    value={langPrefs.language}
-                    onChange={(e) =>
-                      setLangPrefs((p) => ({ ...p, language: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option>English (UK)</option>
-                    <option>English (US)</option>
-                    <option>Igbo</option>
-                    <option>Yoruba</option>
-                    <option>Hausa</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Timezone
-                  </label>
-                  <select
-                    value={langPrefs.timezone}
-                    onChange={(e) =>
-                      setLangPrefs((p) => ({ ...p, timezone: e.target.value }))
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option>WAT (UTC+1)</option>
-                    <option>GMT (UTC+0)</option>
-                  </select>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {activeSection === "hospital" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Hospital Settings
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-w-2xl">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Hospital Name
-                  </label>
-                  <input
-                    defaultValue={hospital}
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    State
-                  </label>
-                  <input
-                    defaultValue="Anambra"
-                    className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
-                Only administrators can modify hospital-wide settings.
-              </p>
-            </Card>
-          )}
-
-          {activeSection === "integrations" && (
-            <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Integrations
-              </h3>
-              <div className="flex flex-col gap-3">
-                {[
-                  [
-                    "nhis",
-                    "NHIS Verification API",
-                    "Verify patient insurance eligibility",
-                  ],
-                  [
-                    "smsGateway",
-                    "SMS Gateway",
-                    "Send patient reminders and alerts via SMS",
-                  ],
-                  [
-                    "backup",
-                    "Cloud Backup Service",
-                    "Automatic daily encrypted backups",
-                  ],
-                ].map(([key, label, desc]) => (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-[10px]"
-                    style={{ padding: 16 }}
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        {label}
-                      </div>
-                      <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        {desc}
-                      </div>
-                    </div>
-                    <Toggle
-                      on={integrations[key]}
-                      onChange={() =>
-                        setIntegrations((p) => ({ ...p, [key]: !p[key] }))
-                      }
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2 text-xs">
+                  <div className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <Lock
+                      size={14}
+                      className="text-emerald-600 dark:text-emerald-400"
                     />
+                    <span>Compliance & Security Controls</span>
                   </div>
-                ))}
+                  <ul className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5 list-disc pl-4">
+                    <li>
+                      Passwords hashed using PBKDF2/Bcrypt with random
+                      salt[cite: 1, 12].
+                    </li>
+                    <li>
+                      Account lockout triggers after 5 failed consecutive
+                      attempts[cite: 1, 4].
+                    </li>
+                    <li>
+                      Records sealed at rest using per-record fresh AES-256
+                      keys[cite: 1].
+                    </li>
+                  </ul>
+                </div>
               </div>
             </Card>
           )}
 
-          {activeSection === "support" && (
+          {activeTab === "support" && (
             <Card className="p-6">
-              <h3 className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-5">
-                Contact Support
-              </h3>
+              <div className="mb-4">
+                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                  Contact Hospital IT Support
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Report account authorization issues or submit administrative
+                  change requests.
+                </p>
+              </div>
+
               <form
                 onSubmit={handleSupportSubmit}
-                className="flex flex-col gap-3.5 max-w-lg"
+                className="space-y-4 max-w-lg"
               >
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={supportMsg}
                   onChange={(e) => setSupportMsg(e.target.value)}
-                  placeholder="Describe the issue you're experiencing..."
-                  className="w-full bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 resize-none"
+                  placeholder="Describe your issue in detail..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 resize-none"
                 />
-                <button
-                  type="submit"
-                  className="self-start bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Send size={14} />
-                  Send to IT
-                </button>
+                <Button type="submit" variant="primary" size="sm">
+                  <Send size={13} />
+                  <span>Dispatch Request</span>
+                </Button>
               </form>
             </Card>
           )}

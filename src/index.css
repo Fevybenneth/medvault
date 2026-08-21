@@ -10,25 +10,20 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
-.scroll-fade {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-.scroll-fade.is-scrolling,
-.scroll-fade:hover {
-  scrollbar-color: rgba(148, 163, 184, 0.6) transparent;
-}
-.scroll-fade::-webkit-scrollbar {
+/* Add to src/index.css */
+.fade-scroll::-webkit-scrollbar {
   width: 6px;
-}
-.scroll-fade::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scroll-fade::-webkit-scrollbar-thumb {
   background-color: transparent;
-  border-radius: 9999px;
+  transition: all 0.3s ease;
 }
-.scroll-fade.is-scrolling::-webkit-scrollbar-thumb,
-.scroll-fade:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.6);
+
+.fade-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+/* Only show the thumb when the hook adds .is-scrolling or on hover */
+.fade-scroll.is-scrolling::-webkit-scrollbar-thumb,
+.fade-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1; /* Tailwind slate-300 */
 }

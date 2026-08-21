@@ -1,13 +1,24 @@
-const API_BASE_URL = 
-  import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const TOKEN_KEY = "medvault_token";
+const USER_KEY = "medvault_user";
 
 const getToken = () => localStorage.getItem(TOKEN_KEY);
 
 const clearAuth = () => {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem("medvault_user");
+  localStorage.removeItem(USER_KEY);
+};
+
+const buildQueryString = (params = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, String(value));
+    }
+  });
+  const qs = query.toString();
+  return qs ? `?${qs}` : "";
 };
 
 const request = async (path, options = {}) => {
@@ -35,7 +46,9 @@ const request = async (path, options = {}) => {
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
+    // 401: Unauthorized (Token Expired / Missing)
+    // 423: Account Locked
+    if (response.status === 401 || response.status === 423) {
       clearAuth();
     }
 
@@ -54,7 +67,7 @@ const request = async (path, options = {}) => {
 
 export const api = {
   // ─────────────────────────────────────────────
-  // Authentication
+  // Authentication & Session
   // ─────────────────────────────────────────────
 
   login: async (email, password) =>
@@ -80,7 +93,7 @@ export const api = {
     }),
 
   // ─────────────────────────────────────────────
-  // Dashboard / System
+  // Dashboard & Metrics
   // ─────────────────────────────────────────────
 
   getSystemHealth: async () =>
@@ -104,11 +117,11 @@ export const api = {
     }),
 
   // ─────────────────────────────────────────────
-  // Users / Staff
+  // Staff & User Management (Admin)
   // ─────────────────────────────────────────────
 
-  getUsers: async () =>
-    request("/auth/users", {
+  getUsers: async (params = {}) =>
+    request(`/auth/users${buildQueryString(params)}`, {
       method: "GET",
     }),
 
@@ -125,21 +138,17 @@ export const api = {
     }),
 
   // ─────────────────────────────────────────────
-  // Patients
+  // Patients & Identity Resolution
   // ─────────────────────────────────────────────
 
   getPatients: async (params = {}) => {
-    const query = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        query.set(key, value);
-      }
-    });
-
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-
-    return request(`/patients/${suffix}`, {
+    // Normalizes both 'q' and 'search' to match the backend ILIKE handler
+    const queryParams = { ...params };
+    if (queryParams.q && !queryParams.search) {
+      queryParams.search = queryParams.q;
+      delete queryParams.q;
+    }
+    return request(`/patients${buildQueryString(queryParams)}`, {
       method: "GET",
     });
   },
@@ -150,7 +159,7 @@ export const api = {
     }),
 
   registerPatient: async (payload) =>
-    request("/patients/", {
+    request("/patients", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -168,21 +177,17 @@ export const api = {
     }),
 
   // ─────────────────────────────────────────────
-  // Records
+  // Medical Records & Cryptographic Storage
   // ─────────────────────────────────────────────
 
   getRecords: async (params = {}) => {
-    const query = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        query.set(key, value);
-      }
-    });
-
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-
-    return request(`/records/${suffix}`, {
+    // Normalizes both 'search' and 'q' to match the backend Record metadata handler
+    const queryParams = { ...params };
+    if (queryParams.search && !queryParams.q) {
+      queryParams.q = queryParams.search;
+      delete queryParams.search;
+    }
+    return request(`/records${buildQueryString(queryParams)}`, {
       method: "GET",
     });
   },
@@ -205,24 +210,13 @@ export const api = {
     }),
 
   // ─────────────────────────────────────────────
-  // Audit
+  // Audit Ledger & Forensic Reports
   // ─────────────────────────────────────────────
 
-  getAuditLogs: async (params = {}) => {
-    const query = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        query.set(key, value);
-      }
-    });
-
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-
-    return request(`/audit/logs${suffix}`, {
+  getAuditLogs: async (params = {}) =>
+    request(`/audit/logs${buildQueryString(params)}`, {
       method: "GET",
-    });
-  },
+    }),
 
   getAuditReport: async (recordId) =>
     request(`/audit/report/${recordId}`, {
@@ -230,4 +224,4 @@ export const api = {
     }),
 };
 
-export { API_BASE_URL, TOKEN_KEY };
+export { API_BASE_URL, TOKEN_KEY, USER_KEY, clearAuth };

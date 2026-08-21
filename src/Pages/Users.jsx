@@ -74,65 +74,148 @@ function CreateUserModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <Card className="w-full p-6" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="w-full p-6 max-h-[85vh] overflow-y-auto"
+        style={{ maxWidth: 440 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-[15px] font-semibold text-slate-800">Create Staff Account</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+          <h3 className="text-[15px] font-semibold text-slate-800">
+            Create Staff Account
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X size={18} />
+          </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">First Name</label>
-              <input required value={form.firstName} onChange={(e) => update('firstName', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                First Name
+              </label>
+              <input
+                required
+                value={form.firstName}
+                onChange={(e) => update("firstName", e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Last Name</label>
-              <input required value={form.lastName} onChange={(e) => update('lastName', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Last Name
+              </label>
+              <input
+                required
+                value={form.lastName}
+                onChange={(e) => update("lastName", e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Email
+            </label>
             <div className="relative">
-              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input required type="email" value={form.email} onChange={(e) => update('email', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <Mail
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={(e) => update("email", e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Password</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Password
+            </label>
             <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input required type="password" value={form.password} onChange={(e) => update('password', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <Lock
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                required
+                type="password"
+                value={form.password}
+                onChange={(e) => update("password", e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Role</label>
-            <select value={form.role} onChange={(e) => update('role', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500">
-              {ROLES.map((r) => <option key={r} value={r}>{roleLabel[r]}</option>)}
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Role
+            </label>
+            <select
+              value={form.role}
+              onChange={(e) => update("role", e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+            >
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {roleLabel[r]}
+                </option>
+              ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Department</label>
-              <input value={form.department} onChange={(e) => update('department', e.target.value)} placeholder="Optional" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Department
+              </label>
+              <input
+                value={form.department}
+                onChange={(e) => update("department", e.target.value)}
+                placeholder="Optional"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">License Number</label>
-              <input value={form.licenseNumber} onChange={(e) => update('licenseNumber', e.target.value)} placeholder="Optional" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                License Number
+              </label>
+              <input
+                value={form.licenseNumber}
+                onChange={(e) => update("licenseNumber", e.target.value)}
+                placeholder="Optional"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
             </div>
           </div>
           <div className="flex gap-2 mt-2">
-            <button type="submit" disabled={submitting} className="flex-1 bg-blue-600 text-white font-semibold text-sm py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60">
-              {submitting ? 'Creating...' : 'Create Account'}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 bg-blue-600 text-white font-semibold text-sm py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+            >
+              {submitting ? "Creating..." : "Create Account"}
             </button>
-            <button type="button" onClick={onClose} disabled={submitting} className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 disabled:opacity-60">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 disabled:opacity-60"
+            >
               Cancel
             </button>
           </div>
         </form>
       </Card>
     </div>
-  )
+  );
 }
 
 function EditUserModal({ user, onClose, onUpdated }) {
