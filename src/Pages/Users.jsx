@@ -266,6 +266,7 @@ export default function Users() {
           roleType: u.role,
           role: roleLabel[u.role] || u.role,
           dept: u.department || '—',
+          license: u.license_number || '', 
           joined: formatDate(u.created_at),
           status: u.is_locked ? 'Locked' : u.is_active ? 'Active' : 'Inactive',
         }))

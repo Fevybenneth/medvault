@@ -12,6 +12,7 @@ import {
   HeartPulse,
   FileText,
   ChevronRight,
+  X
 } from "lucide-react";
 import { api } from "../lib/api";
 import { Card, Badge, Button } from "../components/ui";
@@ -55,6 +56,148 @@ function formatDate(timestamp) {
   }
 }
 
+function EditPatientModal({ patient, onClose, onUpdated }) {
+  const showToast = useToast();
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    first_name: patient.first_name,
+    last_name: patient.last_name,
+    age: patient.age,
+    gender: patient.gender || "",
+    phone: patient.phone || "",
+    address: patient.address || "",
+  });
+  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.updatePatient(patient.id, form);
+      showToast("Patient updated");
+      onUpdated();
+      onClose();
+    } catch (err) {
+      showToast(err.message || "Could not update patient", "info");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="w-full p-6 max-h-[85vh] overflow-y-auto"
+        style={{ maxWidth: 460 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-[15px] font-semibold text-slate-800">
+            Edit {patient.first_name} {patient.last_name}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                First Name
+              </label>
+              <input
+                value={form.first_name}
+                onChange={(e) => update("first_name", e.target.value)}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Last Name
+              </label>
+              <input
+                value={form.last_name}
+                onChange={(e) => update("last_name", e.target.value)}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Age
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.age}
+                onChange={(e) => update("age", Number(e.target.value))}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Gender
+              </label>
+              <input
+                value={form.gender}
+                onChange={(e) => update("gender", e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Phone
+            </label>
+            <input
+              value={form.phone}
+              onChange={(e) => update("phone", e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Address
+            </label>
+            <input
+              value={form.address}
+              onChange={(e) => update("address", e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 bg-blue-600 text-white font-semibold text-sm py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+            >
+              {submitting ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
 function InfoField({ label, value }) {
   return (
     <div>
@@ -73,6 +216,7 @@ export default function PatientProfile() {
   const navigate = useNavigate();
   const showToast = useToast();
   const { hasPermission } = useAuth();
+  const [editOpen, setEditOpen] = useState(false);
 
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -169,7 +313,7 @@ export default function PatientProfile() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => showToast("Edit patient form coming soon", "info")}
+              onClick={() => setEditOpen(true)}
             >
               <Pencil size={13} />
               Edit
@@ -305,6 +449,13 @@ export default function PatientProfile() {
           patient={patient}
           onClose={() => setGrantOpen(false)}
           onGranted={loadPatient}
+        />
+      )}
+      {editOpen && (
+        <EditPatientModal
+          patient={patient}
+          onClose={() => setEditOpen(false)}
+          onUpdated={loadPatient}
         />
       )}
     </div>

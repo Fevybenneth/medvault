@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Database,
   FileText,
-  HardDrive,
   HeartPulse,
   History,
   LockKeyhole,
@@ -14,6 +13,7 @@ import {
   ShieldCheck,
   UploadCloud,
   UserCog,
+  UserPlus,
   Users,
   Wifi,
 } from "lucide-react";
@@ -23,33 +23,6 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { ROLE_LABELS, ROLES } from "../config/navigation";
 
-const STORAGE_PROVIDER_META = {
-  cloudflare_r2: {
-    label: "Cloudflare R2",
-    capacityBytes: 10 * 1024 * 1024 * 1024,
-    hasKnownCapacity: true,
-  },
-  minio: {
-    label: "MinIO",
-    capacityBytes: null,
-    hasKnownCapacity: false,
-  },
-  s3_compatible: {
-    label: "S3-compatible storage",
-    capacityBytes: null,
-    hasKnownCapacity: false,
-  },
-};
-
-function getStorageMeta(provider) {
-  return (
-    STORAGE_PROVIDER_META[provider] || {
-      label: "Object storage",
-      capacityBytes: null,
-      hasKnownCapacity: false,
-    }
-  );
-}
 const ROLE_INTRO = {
   [ROLES.ADMIN]: "System overview, staff access and security posture.",
   [ROLES.DOCTOR]: "Your clinical workspace and assigned-record activity.",
@@ -63,10 +36,15 @@ const ROLE_INTRO = {
 const ACTIONS = {
   [ROLES.ADMIN]: [
     {
+      label: "Create staff",
+      icon: UserPlus,
+      to: "/users",
+      primary: true,
+    },
+    {
       label: "Link portal",
       icon: Users,
       to: "/patients/link-portal",
-      primary: true,
     },
     {
       label: "Manage users",
@@ -216,6 +194,9 @@ function timeAgo(isoString) {
   return `${days}d ago`;
 }
 
+// Compact horizontal stat card — icon + value inline, single detail line.
+// Replaces the previous stacked layout (icon row, then large value, then
+// label, then detail) which ran ~142px tall on desktop for no real reason.
 function StatCard({ icon: Icon, label, value, detail, tone = "neutral" }) {
   const tones = {
     neutral: "bg-slate-50 text-slate-600",
@@ -225,27 +206,29 @@ function StatCard({ icon: Icon, label, value, detail, tone = "neutral" }) {
   };
 
   return (
-    <Card className="p-4 min-w-0">
-      <div className="flex items-start justify-between gap-3">
+    <Card className="p-3.5 min-w-0">
+      <div className="flex items-center gap-3">
         <div
-          className={`w-9 h-9 rounded-lg flex items-center justify-center ${tones[tone]}`}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${tones[tone]}`}
         >
-          <Icon size={17} />
+          <Icon size={15} />
         </div>
 
-        <span className="text-[10px] uppercase tracking-wider text-slate-400">
-          Current
-        </span>
-      </div>
+        <div className="min-w-0">
+          <div className="text-lg font-display font-bold text-slate-800 truncate leading-tight">
+            {value}
+          </div>
 
-      <div className="mt-4 text-2xl font-display font-bold text-slate-800 truncate">
-        {value}
+          <div className="text-[11px] font-medium text-slate-600 truncate">
+            {label}
+          </div>
+        </div>
       </div>
-
-      <div className="text-xs font-medium text-slate-600 mt-0.5">{label}</div>
 
       {detail && (
-        <div className="text-[11px] text-slate-400 mt-1 truncate">{detail}</div>
+        <div className="text-[10.5px] text-slate-400 mt-2 truncate">
+          {detail}
+        </div>
       )}
     </Card>
   );
@@ -284,14 +267,17 @@ function SectionTitle({ title, caption, action, onAction, badge }) {
 
 function LoadingCard() {
   return (
-    <Card className="p-4 h-[142px]">
-      <div className="h-9 w-9 rounded-lg bg-slate-100 animate-pulse" />
+    <Card className="p-3.5 h-[86px]">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 rounded-lg bg-slate-100 animate-pulse shrink-0" />
 
-      <div className="h-7 w-20 rounded bg-slate-100 animate-pulse mt-4" />
+        <div className="flex-1">
+          <div className="h-5 w-16 rounded bg-slate-100 animate-pulse" />
+          <div className="h-3 w-20 rounded bg-slate-100 animate-pulse mt-1.5" />
+        </div>
+      </div>
 
       <div className="h-3 w-28 rounded bg-slate-100 animate-pulse mt-2" />
-
-      <div className="h-3 w-36 rounded bg-slate-100 animate-pulse mt-2" />
     </Card>
   );
 }
@@ -439,7 +425,10 @@ export default function Dashboard() {
       requests.push(["health", api.getSystemHealth()]);
     }
 
-    if (canViewRecordStats) {
+    // Admin now shares this fetch too — its record stats and recent-records
+    // list previously went either unused (stats) or unfetched (recent),
+    // which is what left the admin dashboard with no real records view.
+    if (canViewRecordStats || isAdmin) {
       requests.push(["record", api.getRecordStats()]);
 
       requests.push([
@@ -455,8 +444,6 @@ export default function Dashboard() {
       requests.push(["staff", api.getStaffStats()]);
 
       requests.push(["patients", api.getPatients()]);
-
-      requests.push(["record", api.getRecordStats()]);
     }
 
     if (canAudit) {
@@ -561,6 +548,13 @@ export default function Dashboard() {
 
   const isAuditRole = canAudit;
 
+  // Only Auditor gets the dedicated audit-activity panel and the full
+  // breakdown section further down — that's their whole job. Admin now
+  // sees the same "what's actually happening with records" view every
+  // other operational role sees, instead of a third copy of audit numbers.
+  const showAuditPanel = role === ROLES.AUDITOR;
+  const showRecentActivity = canViewRecordStats || isAdmin;
+
   const dataScope = isPatient
     ? "Own records"
     : role === ROLES.DOCTOR
@@ -580,14 +574,7 @@ export default function Dashboard() {
             icon: Users,
             label: "Active staff",
             value: staff.active ?? "—",
-            detail: `${staff.total ?? 0} staff accounts`,
-            tone: "neutral",
-          },
-          {
-            icon: UserCog,
-            label: "Locked staff",
-            value: staff.locked ?? "—",
-            detail: "Accounts requiring attention",
+            detail: `${staff.total ?? 0} total · ${staff.locked ?? 0} locked`,
             tone: staff.locked > 0 ? "amber" : "neutral",
           },
           {
@@ -598,11 +585,18 @@ export default function Dashboard() {
             tone: "neutral",
           },
           {
-            icon: ShieldCheck,
-            label: "Audit events",
-            value: totalAudit || "—",
-            detail: `${blocked} blocked · ${errorEvents} errors`,
+            icon: FileText,
+            label: "Medical records",
+            value: record.total ?? "—",
+            detail: `${record.attachments ?? 0} with attachments`,
             tone: "neutral",
+          },
+          {
+            icon: ShieldCheck,
+            label: "Security",
+            value: blocked || "—",
+            detail: `${blocked} blocked · ${errorEvents} errors`,
+            tone: blocked > 0 ? "amber" : "neutral",
           },
         ]
       : role === ROLES.AUDITOR
@@ -691,8 +685,6 @@ export default function Dashboard() {
 
           {isAuditRole && health.status && (
             <>
-              {/* <span className="text-[10px] text-slate-300">•</span> */}
-
               <span
                 className={`inline-flex items-center gap-1.5 text-[10px] font-semibold ${
                   health.status === "healthy"
@@ -750,6 +742,7 @@ export default function Dashboard() {
       </div>
     </header>
   );
+
   const ErrorBanner = errors.length > 0 && (
     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
       Some current metrics could not be loaded: {errors.join(", ")}. The
@@ -846,117 +839,34 @@ export default function Dashboard() {
           : primaryStats.map((stat) => <StatCard key={stat.label} {...stat} />)}
       </div>
 
-      {isAdmin &&
-        (() => {
-          const storageMeta = getStorageMeta(health.storage?.provider);
-
-          return (
-            <Card className="p-5 mb-4">
-              <SectionTitle
-                title="Storage usage"
-                caption={
-                  storageMeta.hasKnownCapacity
-                    ? `Total encrypted record storage against the ${storageMeta.label} free tier.`
-                    : `Total encrypted record storage on ${storageMeta.label}. No fixed platform capacity to measure against.`
-                }
-              />
-
-              <div className="flex items-center gap-3 mb-2">
-                <span className="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center shrink-0">
-                  <HardDrive size={16} />
-                </span>
-
-                <div className="flex-1">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="font-semibold text-slate-800">
-                      {formatBytes(storageUsedBytes)} used
-                    </span>
-
-                    {storageMeta.hasKnownCapacity ? (
-                      <span className="text-slate-400">
-                        {formatBytes(storageMeta.capacityBytes)} free tier limit
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">
-                        {storageMeta.label}
-                      </span>
-                    )}
-                  </div>
-
-                  {storageMeta.hasKnownCapacity ? (
-                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          Math.round(
-                            (storageUsedBytes / storageMeta.capacityBytes) *
-                              100,
-                          ) >= 90
-                            ? "bg-amber-500"
-                            : "bg-slate-400"
-                        }`}
-                        style={{
-                          width: `${Math.max(
-                            2,
-                            Math.min(
-                              100,
-                              Math.round(
-                                (storageUsedBytes / storageMeta.capacityBytes) *
-                                  100,
-                              ),
-                            ),
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-slate-400 italic">
-                      No platform-defined capacity for self-hosted storage.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {storageMeta.hasKnownCapacity && (
-                <p className="text-[11px] text-slate-400 mt-3">
-                  {Math.round(
-                    (storageUsedBytes / storageMeta.capacityBytes) * 100,
-                  )}
-                  % of the {storageMeta.label} free tier used. Covers attached
-                  files across all patient records.
-                </p>
-              )}
-            </Card>
-          );
-        })()}
-
       <div className="grid grid-cols-1 xl:grid-cols-[1.65fr_1fr] gap-4 mb-4">
         <Card className="p-5">
           <SectionTitle
             title={
-              isAuditRole
+              showAuditPanel
                 ? "Audit activity"
-                : canViewRecordStats
-                  ? "Recent activity"
+                : showRecentActivity
+                  ? "Recent record activity"
                   : "Overview"
             }
             caption={
-              isAuditRole
+              showAuditPanel
                 ? "Events currently recorded by the audit service."
-                : canViewRecordStats
-                  ? "Your most recently added records."
+                : showRecentActivity
+                  ? "Most recently added records."
                   : "Current dashboard information."
             }
             action={
-              isAuditRole
+              showAuditPanel
                 ? "Open audit"
-                : canViewRecordStats
+                : showRecentActivity
                   ? "Open records"
                   : undefined
             }
-            onAction={() => navigate(isAuditRole ? "/audit" : "/records")}
+            onAction={() => navigate(showAuditPanel ? "/audit" : "/records")}
           />
 
-          {isAuditRole ? (
+          {showAuditPanel ? (
             <div className="space-y-3">
               {auditActions.length ? (
                 auditActions.map(([action, count]) => {
@@ -991,7 +901,7 @@ export default function Dashboard() {
                 <EmptyState text="No audit activity has been recorded yet." />
               )}
             </div>
-          ) : canViewRecordStats ? (
+          ) : showRecentActivity ? (
             <RecentRecords
               records={recentRecords}
               onOpen={(id) => navigate(`/records/${id}`)}
@@ -1018,11 +928,17 @@ export default function Dashboard() {
                 status={health.database?.status}
               />
 
+              {/* Storage now folds usage into this row instead of a
+                  separate full-width card above the fold. */}
               <ChainRow
                 icon={Server}
                 label={`Storage · ${health.storage?.provider || "Storage"}`}
                 status={health.storage?.status}
-                detail={health.storage?.status}
+                detail={
+                  health.storage?.status && health.storage.status !== "healthy"
+                    ? health.storage.status
+                    : `${formatBytes(storageUsedBytes)} used`
+                }
                 isLast
               />
             </div>
@@ -1055,7 +971,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {isAuditRole && (
+      {/* Full audit breakdown now stays Auditor-only — Admin already sees
+          a compact Security card up top; this section duplicated that
+          same data a second and third time. */}
+      {role === ROLES.AUDITOR && (
         <Card className="p-5 mb-4">
           <SectionTitle
             title="Audit integrity"
