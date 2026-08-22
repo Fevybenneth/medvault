@@ -26,9 +26,22 @@ const TABS = [
   { id: "support", label: "IT Support", icon: LifeBuoy },
 ];
 
+function decodeTokenExpiry(token) {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (!payload.exp) return null;
+    const msLeft = payload.exp * 1000 - Date.now();
+    if (msLeft <= 0) return "Expired";
+    const mins = Math.round(msLeft / 60000);
+    return mins >= 60 ? `${Math.round(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+  } catch {
+    return null;
+  }
+}
+
 export default function Settings() {
   const showToast = useToast();
-  const { user, role, refreshUser } = useAuth();
+  const { user, role, token, refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabQuery = searchParams.get("tab");
@@ -73,6 +86,19 @@ export default function Settings() {
         console.warn("Could not sync user profile:", err.message);
       });
   }, []);
+
+  const [lockedCount, setLockedCount] = useState(null);
+
+  useEffect(() => {
+    if (role !== "admin") return;
+    api
+      .getUsers({ limit: 200 })
+      .then((data) => {
+        const locked = (data?.users || []).filter((u) => u.is_locked).length;
+        setLockedCount(locked);
+      })
+      .catch(() => setLockedCount(null));
+  }, [role]);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -342,7 +368,7 @@ export default function Settings() {
                       </div>
                     </div>
                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                      Active
+                      Expires in {decodeTokenExpiry(token) || "—"}
                     </span>
                   </div>
                 </div>
@@ -370,10 +396,35 @@ export default function Settings() {
                     </li>
                   </ul>
                 </div>
+                {role === "admin" && (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2 text-xs">
+                    <div className="font-bold text-slate-800 dark:text-slate-100">
+                      System Session Policy
+                    </div>
+                    <ul className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5 list-disc pl-4">
+                      <li>
+                        Single active session per account — a new login
+                        invalidates the previous session token.
+                      </li>
+                      <li>
+                        Session tokens expire automatically after 45 minutes.
+                      </li>
+                      <li>
+                        {lockedCount === null ? "—" : lockedCount} account
+                        {lockedCount === 1 ? "" : "s"} currently locked.{" "}
+                        <a
+                          href="/users"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Review in Users →
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                )}
               </div>
             </Card>
           )}
-
           {activeTab === "support" && (
             <Card className="p-6">
               <div className="mb-4">

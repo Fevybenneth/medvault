@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api, setOnUnauthorized } from "../lib/api";
 
 const AuthContext = createContext(null);
 
@@ -116,6 +116,11 @@ export function AuthProvider({ children }) {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    setOnUnauthorized(() => setUser(null));
+    return () => setOnUnauthorized(null);
   }, []);
 
   const role = user?.role || user?.role_name || user?.role?.role_name || null;

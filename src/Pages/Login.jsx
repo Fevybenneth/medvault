@@ -57,13 +57,12 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
-
       {/* Mobile header */}
       <div
         className="flex lg:hidden items-center gap-2.5 px-6 py-5"
         style={{
           background:
-            'linear-gradient(145deg, #060C18 0%, #0F1D36 50%, #0A1628 100%)',
+            "linear-gradient(145deg, #060C18 0%, #0F1D36 50%, #0A1628 100%)",
         }}
       >
         <img
@@ -71,7 +70,7 @@ export default function Login() {
           alt="MedVault"
           style={{
             height: 36,
-            filter: 'brightness(0) invert(1)',
+            filter: "brightness(0) invert(1)",
           }}
           className="object-contain"
         />
@@ -86,7 +85,7 @@ export default function Login() {
         className="hidden lg:flex w-[54%] relative flex-col p-12 overflow-hidden"
         style={{
           background:
-            'linear-gradient(145deg, #060C18 0%, #0F1D36 50%, #0A1628 100%)',
+            "linear-gradient(145deg, #060C18 0%, #0F1D36 50%, #0A1628 100%)",
         }}
       >
         {/* Subtle grid */}
@@ -94,8 +93,8 @@ export default function Login() {
           className="absolute inset-0 opacity-[0.025] pointer-events-none"
           style={{
             backgroundImage:
-              'linear-gradient(#3B82F6 1px, transparent 1px), linear-gradient(90deg, #3B82F6 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
+              "linear-gradient(#3B82F6 1px, transparent 1px), linear-gradient(90deg, #3B82F6 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
           }}
         />
 
@@ -106,10 +105,10 @@ export default function Login() {
             width: 560,
             height: 560,
             right: -220,
-            top: '50%',
-            transform: 'translateY(-50%)',
+            top: "50%",
+            transform: "translateY(-50%)",
             background:
-              'radial-gradient(circle, rgba(37,99,235,.14) 0%, rgba(37,99,235,.04) 38%, transparent 70%)',
+              "radial-gradient(circle, rgba(37,99,235,.14) 0%, rgba(37,99,235,.04) 38%, transparent 70%)",
           }}
         />
 
@@ -121,7 +120,7 @@ export default function Login() {
             left: -120,
             bottom: -100,
             background:
-              'radial-gradient(circle, rgba(20,184,166,.08) 0%, transparent 70%)',
+              "radial-gradient(circle, rgba(20,184,166,.08) 0%, transparent 70%)",
           }}
         />
 
@@ -132,21 +131,20 @@ export default function Login() {
           className="w-auto relative z-10 self-start object-contain"
           style={{
             height: 64,
-            filter: 'brightness(0) invert(1)',
+            filter: "brightness(0) invert(1)",
           }}
         />
 
         {/* Shield visual */}
         <div className="flex-1 flex items-center justify-center relative z-10 py-12">
           <div className="relative flex items-center justify-center w-[390px] h-[390px]">
-
             {/* Outer glow */}
             <div
               className="absolute rounded-full"
               style={{
                 inset: 45,
                 background:
-                  'radial-gradient(circle, rgba(59,130,246,.12) 0%, rgba(59,130,246,.04) 45%, transparent 72%)',
+                  "radial-gradient(circle, rgba(59,130,246,.12) 0%, rgba(59,130,246,.04) 45%, transparent 72%)",
               }}
             />
 
@@ -178,11 +176,10 @@ export default function Login() {
                 width: 178,
                 height: 205,
                 clipPath:
-                  'polygon(50% 0%, 91% 14%, 91% 52%, 80% 72%, 66% 87%, 50% 100%, 34% 87%, 20% 72%, 9% 52%, 9% 14%)',
+                  "polygon(50% 0%, 91% 14%, 91% 52%, 80% 72%, 66% 87%, 50% 100%, 34% 87%, 20% 72%, 9% 52%, 9% 14%)",
                 background:
-                  'linear-gradient(145deg, rgba(96,165,250,.95), rgba(37,99,235,.88) 55%, rgba(15,23,42,.96))',
-                filter:
-                  'drop-shadow(0 0 28px rgba(37,99,235,.24))',
+                  "linear-gradient(145deg, rgba(96,165,250,.95), rgba(37,99,235,.88) 55%, rgba(15,23,42,.96))",
+                filter: "drop-shadow(0 0 28px rgba(37,99,235,.24))",
               }}
             >
               <div
@@ -190,9 +187,9 @@ export default function Login() {
                 style={{
                   inset: 2,
                   clipPath:
-                    'polygon(50% 0%, 91% 14%, 91% 52%, 80% 72%, 66% 87%, 50% 100%, 34% 87%, 20% 72%, 9% 52%, 9% 14%)',
+                    "polygon(50% 0%, 91% 14%, 91% 52%, 80% 72%, 66% 87%, 50% 100%, 34% 87%, 20% 72%, 9% 52%, 9% 14%)",
                   background:
-                    'linear-gradient(145deg, rgba(15,23,42,.98), rgba(15,31,54,.96))',
+                    "linear-gradient(145deg, rgba(15,23,42,.98), rgba(15,31,54,.96))",
                 }}
               />
 
@@ -201,13 +198,11 @@ export default function Login() {
                 <div
                   className="w-[52px] h-[42px] rounded-[10px] border-2 border-blue-300/80 relative"
                   style={{
-                    background: 'rgba(59,130,246,.14)',
-                    boxShadow: '0 0 24px rgba(59,130,246,.14)',
+                    background: "rgba(59,130,246,.14)",
+                    boxShadow: "0 0 24px rgba(59,130,246,.14)",
                   }}
                 >
-                  <div
-                    className="absolute left-1/2 -top-[27px] -translate-x-1/2 w-[29px] h-[29px] rounded-t-full border-2 border-b-0 border-blue-300/80"
-                  />
+                  <div className="absolute left-1/2 -top-[27px] -translate-x-1/2 w-[29px] h-[29px] rounded-t-full border-2 border-b-0 border-blue-300/80" />
 
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-blue-300">
                     <div className="absolute left-1/2 top-full -translate-x-1/2 w-1 h-2.5 bg-blue-300 rounded-b-full" />
@@ -249,11 +244,10 @@ export default function Login() {
       {/* Right form */}
       <div
         className="flex-1 flex items-center justify-center bg-white px-6 py-8 sm:p-13"
-        style={{ padding: 'clamp(24px, 6vw, 52px)' }}
+        style={{ padding: "clamp(24px, 6vw, 52px)" }}
       >
         <div className="w-full max-w-[340px]">
-
-          {mode === 'login' ? (
+          {mode === "login" ? (
             <>
               <div style={{ marginBottom: 30 }}>
                 <h1 className="font-display text-[28px] font-bold text-slate-800 mb-1.5">
@@ -306,7 +300,7 @@ export default function Login() {
                     />
 
                     <input
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -319,14 +313,10 @@ export default function Login() {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
                       aria-label={
-                        showPassword ? 'Hide password' : 'Show password'
+                        showPassword ? "Hide password" : "Show password"
                       }
                     >
-                      {showPassword ? (
-                        <Eye size={16} />
-                      ) : (
-                        <EyeOff size={16} />
-                      )}
+                      {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
                     </button>
                   </div>
                 </div>
@@ -336,14 +326,14 @@ export default function Login() {
                   <div
                     className={`text-xs rounded-lg px-3 py-2 border ${
                       lockedOut
-                        ? 'text-amber-700 bg-amber-50 border-amber-200'
-                        : 'text-red-600 bg-red-50 border-red-200'
+                        ? "text-amber-700 bg-amber-50 border-amber-200"
+                        : "text-red-600 bg-red-50 border-red-200"
                     }`}
                   >
                     {error}
 
                     {lockedOut &&
-                      ' Contact an administrator to unlock your account.'}
+                      " Contact an administrator to unlock your account."}
                   </div>
                 )}
 
@@ -363,8 +353,13 @@ export default function Login() {
 
                   <button
                     type="button"
-                    onClick={() => setMode('forgot')}
-                    className="text-[13.5px] text-blue-600 font-medium"
+                    onClick={() =>
+                      showToast(
+                        "Contact your system administrator to reset your password.",
+                        "info",
+                      )
+                    }
+                    className="text-xs text-blue-600 hover:underline"
                   >
                     Forgot password?
                   </button>
@@ -378,14 +373,14 @@ export default function Login() {
                 >
                   <ShieldCheck size={18} />
 
-                  {loading ? 'Signing in...' : 'Secure Login'}
+                  {loading ? "Signing in..." : "Secure Login"}
                 </button>
               </form>
 
               {/* Security notice */}
               <div
                 className="bg-emerald-50 border border-emerald-200 rounded-lg flex gap-2.5 items-start"
-                style={{ marginTop: 22, padding: '11px 13px' }}
+                style={{ marginTop: 22, padding: "11px 13px" }}
               >
                 <ShieldCheck
                   size={16}
@@ -407,7 +402,7 @@ export default function Login() {
                 className="text-center text-xs text-slate-400"
                 style={{ marginTop: 14 }}
               >
-                Need access?{' '}
+                Need access?{" "}
                 <a
                   href="mailto:it-support@amaku.gov.ng?subject=MedVault Access Request"
                   className="text-blue-600"
@@ -419,7 +414,7 @@ export default function Login() {
           ) : (
             <>
               <button
-                onClick={() => setMode('login')}
+                onClick={() => setMode("login")}
                 className="flex items-center gap-1.5 text-sm text-slate-500 mb-6"
               >
                 <ArrowLeft size={15} />
@@ -474,5 +469,5 @@ export default function Login() {
         </div>
       </div>
     </div>
-  )
+  );
 }

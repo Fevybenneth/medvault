@@ -15,6 +15,7 @@ import Records from "./Pages/Records";
 import RecordDetail from "./Pages/RecordDetail";
 import Upload from "./Pages/Upload";
 import Users from "./Pages/Users";
+import StaffProfile from "./Pages/StaffProfile";
 import CreateStaff from "./Pages/CreateStaff";
 import Audit from "./Pages/Audit";
 import Reports from "./Pages/Reports";
@@ -240,6 +241,19 @@ function App() {
           >
             <AppLayout>
               <CreateStaff />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users/:id"
+        element={
+          <ProtectedRoute
+            permission="manage_users"
+            message="Viewing staff profiles is restricted to administrators."
+          >
+            <AppLayout>
+              <StaffProfile />
             </AppLayout>
           </ProtectedRoute>
         }

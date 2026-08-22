@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
   Search, Download, Shield, UserPlus, Users as UsersIcon, Stethoscope, ShieldCheck, UserX,
-  Edit2, ChevronLeft, ChevronRight, Loader2, X, Lock, Mail,
+  Edit2, ChevronLeft, ChevronRight, Loader2, X, Lock, Mail, Eye,
 } from 'lucide-react'
+import { useNavigate } from "react-router-dom";
 import { api } from '../lib/api'
 import { Badge, Button, Card } from '../components/ui'
 import { useToast } from '../components/Toast'
@@ -218,123 +219,17 @@ function CreateUserModal({ onClose, onCreated }) {
   );
 }
 
-function EditUserModal({ user, onClose, onUpdated }) {
-  const showToast = useToast();
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    role: user.roleType,
-    department: user.dept === "—" ? "" : user.dept,
-    license_number: user.license || "",
-  });
-  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await api.updateUser(user.id, form);
-      showToast(`${user.name} updated`);
-      onUpdated();
-      onClose();
-    } catch (err) {
-      showToast(err.message || "Could not update user", "info");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <Card
-        className="w-full p-6 max-h-[85vh] overflow-y-auto"
-        style={{ maxWidth: 460 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-[15px] font-semibold text-slate-800">
-            Edit {user.name}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Role
-            </label>
-            <select
-              value={form.role}
-              onChange={(e) => update("role", e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel[r]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Department
-            </label>
-            <input
-              value={form.department}
-              onChange={(e) => update("department", e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              License Number
-            </label>
-            <input
-              value={form.license_number}
-              onChange={(e) => update("license_number", e.target.value)}
-              placeholder="Optional"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-            />
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 bg-blue-600 text-white font-semibold text-sm py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-60"
-            >
-              {submitting ? "Saving..." : "Save Changes"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 disabled:opacity-60"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </Card>
-    </div>
-  );
-}
-
 export default function Users() {
   const showToast = useToast()
   const [roleFilter, setRoleFilter] = useState('All Roles')
   const [showCreate, setShowCreate] = useState(false)
-  const [editTarget, setEditTarget] = useState(null);
+  // const [editTarget, setEditTarget] = useState(null);
 
   const [staff, setStaff] = useState([])
   const [totalStaff, setTotalStaff] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const navigate = useNavigate();
 
   const loadStaff = () => {
     setLoading(true)
@@ -622,11 +517,11 @@ export default function Users() {
                     <td className="px-4 py-3">
                       <div className="flex gap-1.5">
                         <button
-                          onClick={() => setEditTarget(s)}
+                          onClick={() => navigate(`/users/${s.id}`)}
                           className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-100"
-                          title="Edit"
+                          title="View Profile"
                         >
-                          <Edit2 size={12} />
+                          <Eye size={12} />
                         </button>
                         {s.status === "Locked" && (
                           <button
@@ -682,13 +577,6 @@ export default function Users() {
         <CreateUserModal
           onClose={() => setShowCreate(false)}
           onCreated={loadStaff}
-        />
-      )}
-      {editTarget && (
-        <EditUserModal
-          user={editTarget}
-          onClose={() => setEditTarget(null)}
-          onUpdated={loadStaff}
         />
       )}
     </div>

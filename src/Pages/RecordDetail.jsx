@@ -16,8 +16,29 @@ import { api } from "../lib/api";
 import { Card, EncBadge } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/Toast";
+import { ROLES } from "../config/navigation";
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i;
+
+// Mirrors UPLOAD_TYPE_PERMISSIONS in the backend's access_control layer —
+// this is a UX convenience only, the backend is still the real
+// enforcement point. Keep this in sync if the backend mapping changes;
+// it's not derived from anything the API returns.
+const UPLOAD_TYPE_PERMISSIONS = {
+  [ROLES.DOCTOR]: [
+    "Lab Report",
+    "Imaging",
+    "Prescription",
+    "Discharge Summary",
+  ],
+  [ROLES.NURSE]: ["Vitals", "Clinical Notes"],
+  [ROLES.LAB_TECHNICIAN]: ["Lab Report"],
+  [ROLES.RECORDS_OFFICER]: [],
+};
+
+function canUploadType(role, recordType) {
+  return (UPLOAD_TYPE_PERMISSIONS[role] || []).includes(recordType);
+}
 
 function formatDate(timestamp) {
   if (!timestamp) return "—";
@@ -67,7 +88,7 @@ function getFileName(filePath) {
 export default function RecordDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { hasPermission, role } = useAuth();
   const showToast = useToast();
 
   const [record, setRecord] = useState(null);
@@ -399,9 +420,10 @@ export default function RecordDetail() {
               </div>
             </div>
           )}
-                </Card>
+        </Card>
       ) : (
-        hasPermission("upload_records") && (
+        hasPermission("upload_records") &&
+        canUploadType(role, record.record_type) && (
           <Card className="p-5">
             <div className="mb-4">
               <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -412,7 +434,10 @@ export default function RecordDetail() {
               </p>
             </div>
 
-            <form onSubmit={handleAttach} className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <form
+              onSubmit={handleAttach}
+              className="flex flex-col sm:flex-row gap-3 sm:items-center"
+            >
               <input
                 type="file"
                 onChange={(e) => setAttachFile(e.target.files?.[0] || null)}

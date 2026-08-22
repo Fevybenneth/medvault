@@ -10,6 +10,12 @@ const clearAuth = () => {
   localStorage.removeItem(USER_KEY);
 };
 
+let onUnauthorized = null;
+
+export const setOnUnauthorized = (fn) => {
+  onUnauthorized = fn;
+};
+
 const buildQueryString = (params = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -50,6 +56,7 @@ const request = async (path, options = {}) => {
     // 423: Account Locked
     if (response.status === 401 || response.status === 423) {
       clearAuth();
+      if (onUnauthorized) onUnauthorized();
     }
 
     const error = new Error(
@@ -122,6 +129,11 @@ export const api = {
 
   getUsers: async (params = {}) =>
     request(`/auth/users${buildQueryString(params)}`, {
+      method: "GET",
+    }),
+
+  getUser: async (userId) =>
+    request(`/auth/users/${userId}`, {
       method: "GET",
     }),
 
